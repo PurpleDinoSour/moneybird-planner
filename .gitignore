@@ -7,3 +7,8 @@ node_modules/
 # OS
 Thumbs.db
 .DS_Store
+
+# Local Configuration (DO NOT COMMIT)
+# Each laptop maintains its own customer-config.json
+# Only customer-config.template.json is tracked
+customer-config.json

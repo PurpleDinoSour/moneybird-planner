@@ -424,6 +424,24 @@
             </div>
         </div>
 
+        <!-- Customer Profiles -->
+        <div style="background:#fef3c7; padding:16px; border-radius:10px; margin-bottom:16px;">
+            <h3 style="margin:0 0 12px 0; color:#92400e;">👥 Customer Profiles</h3>
+            <p class="text-sm text-muted" style="margin:0 0 12px 0;">Manage customer names and colors. These are stored locally on this laptop.</p>
+            
+            <!-- Add Customer Form -->
+            <div style="display:flex; gap:8px; margin-bottom:12px;">
+                <input type="text" id="newCustomerName" placeholder="Customer name" style="flex:1; padding:8px;">
+                <input type="color" id="newCustomerColor" value="#3b82f6" style="width:50px; cursor:pointer;">
+                <button class="btn btn-primary" onclick="addCustomerUI()">+ Add</button>
+            </div>
+
+            <!-- Customers List -->
+            <div id="customersList" style="max-height:200px; overflow-y:auto; border:1px solid var(--border); border-radius:6px; background:white; padding:8px;">
+                <p style="padding:20px; text-align:center; color:var(--muted);">Loading customers...</p>
+            </div>
+        </div>
+
         <!-- Reset -->
         <div style="text-align:center; padding-top:12px; border-top:1px solid var(--border);">
             <button class="btn btn-danger" onclick="if(confirm('Clear ALL settings?')) { localStorage.clear(); location.reload(); }">🗑️ Reset All Settings</button>
@@ -433,6 +451,7 @@
 
 <!-- JavaScript Modules -->
 <script src="js/config.js"></script>
+<script src="js/customer-config.js"></script>
 <script src="js/utils.js"></script>
 <script src="js/jobs.js"></script>
 <script src="js/calendar.js"></script>

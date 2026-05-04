@@ -57,6 +57,40 @@ function Get-MimeType {
     return "application/octet-stream"
 }
 
+function Get-CustomerConfig {
+    $configFile = Join-Path $scriptDir "customer-config.json"
+    if (-not (Test-Path $configFile)) {
+        $templateFile = Join-Path $scriptDir "customer-config.template.json"
+        if (Test-Path $templateFile) {
+            Copy-Item -Path $templateFile -Destination $configFile -Force
+            Write-Host "Created customer-config.json from template" -ForegroundColor Yellow
+        } else {
+            return @{ customers = @() }
+        }
+    }
+    try {
+        $content = Get-Content -Path $configFile -Raw
+        return $content | ConvertFrom-Json
+    } catch {
+        Write-Host "Error reading customer-config.json: $_" -ForegroundColor Red
+        return @{ customers = @() }
+    }
+}
+
+function Set-CustomerConfig {
+    param($data)
+    $configFile = Join-Path $scriptDir "customer-config.json"
+    try {
+        $json = $data | ConvertTo-Json -Depth 3
+        Set-Content -Path $configFile -Value $json -Force
+        Write-Host "Saved customer-config.json" -ForegroundColor Green
+        return @{ success = $true }
+    } catch {
+        Write-Host "Error saving customer-config.json: $_" -ForegroundColor Red
+        return @{ success = $false; error = $_.Exception.Message }
+    }
+}
+
 function Get-AzureDevOpsCommits {
     param($token, $username, $password, $org, $project, $repo, $fromDate, $toDate)
     if (-not $org -or -not $project -or -not $repo) {
@@ -416,6 +450,39 @@ try {
             }
             Write-Host "Azure test/projects: Org=$azOrg" -ForegroundColor Yellow
             $json = Get-AzureDevOpsProjects -token $azToken -username $azUser -password $azPass -org $azOrg
+            $buffer = [System.Text.Encoding]::UTF8.GetBytes($json)
+            $response.ContentType = "application/json"
+            $response.ContentLength64 = $buffer.Length
+            $response.OutputStream.Write($buffer, 0, $buffer.Length)
+        } elseif ($requestedFile -eq "api/config/customers") {
+            # GET customer configs
+            $config = Get-CustomerConfig
+            $json = $config | ConvertTo-Json -Depth 3
+            Write-Host "Serving customer configs" -ForegroundColor Cyan
+            $buffer = [System.Text.Encoding]::UTF8.GetBytes($json)
+            $response.ContentType = "application/json"
+            $response.ContentLength64 = $buffer.Length
+            $response.OutputStream.Write($buffer, 0, $buffer.Length)
+        } elseif ($requestedFile -eq "api/config/customers/save") {
+            # POST to save customer configs
+            if ($request.HttpMethod -eq "POST") {
+                $reader = New-Object System.IO.StreamReader($request.InputStream)
+                $body = $reader.ReadToEnd()
+                $reader.Close()
+                try {
+                    $data = $body | ConvertFrom-Json
+                    $result = Set-CustomerConfig $data
+                    $json = $result | ConvertTo-Json -Depth 3
+                    $response.StatusCode = 200
+                } catch {
+                    Write-Host "Error processing customer config save: $_" -ForegroundColor Red
+                    $json = @{ success = $false; error = $_.Exception.Message } | ConvertTo-Json
+                    $response.StatusCode = 400
+                }
+            } else {
+                $response.StatusCode = 405
+                $json = '{"error":"Only POST allowed"}'
+            }
             $buffer = [System.Text.Encoding]::UTF8.GetBytes($json)
             $response.ContentType = "application/json"
             $response.ContentLength64 = $buffer.Length

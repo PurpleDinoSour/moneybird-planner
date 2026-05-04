@@ -13,6 +13,8 @@ function escapeHtml(text) {
 function openSettings() {
     document.getElementById('settingsModal').style.display = 'block';
     document.body.style.overflow = 'hidden';
+    // Load customer profiles
+    initializeCustomerUI();
 }
 
 function closeSettings() {
