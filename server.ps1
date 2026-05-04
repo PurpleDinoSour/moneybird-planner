@@ -574,9 +574,9 @@ try {
                     $result = Set-CustomerConfig $data
                     $json = $result | ConvertTo-Json -Depth 3
                     $response.StatusCode = if ($result.success) {
-                        200 
+                        200
                     } else {
-                        409 
+                        409
                     }
                 } catch {
                     Write-Host "Error processing customer config save: $_" -ForegroundColor Red
@@ -611,9 +611,9 @@ try {
                     $result = Set-JobsConfig $data
                     $json = $result | ConvertTo-Json -Depth 3
                     $response.StatusCode = if ($result.success) {
-                        200 
+                        200
                     } else {
-                        409 
+                        409
                     }
                 } catch {
                     Write-Host "Error processing jobs config save: $_" -ForegroundColor Red
