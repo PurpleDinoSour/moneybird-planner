@@ -21,8 +21,21 @@
             <p class="text-sm text-muted" style="margin:4px 0 0 0;">Hour registration with Git integration</p>
         </div>
         <div class="header-actions">
-            <button class="btn btn-ghost" onclick="openSettings()" style="background:#e5e7eb; color:var(--text);">⚙️ Settings</button>
+            <button class="btn btn-ghost" onclick="toggleCustomerOverview()" style="background:#ecfdf5; color:#059669; border:1px solid #a7f3d0;">&#128200; Overview</button>
+            <button class="btn btn-ghost" onclick="openSettings()" style="background:#e5e7eb; color:var(--text);">&#9881; Settings</button>
         </div>
+    </div>
+
+    <!-- Customer Financial Overview -->
+    <div class="card" id="customerOverviewPanel" style="display:none;">
+        <div class="card-header">
+            <div>
+                <h3 class="card-title">&#128200; Financial Overview</h3>
+                <p class="card-subtitle" id="overviewMonthLabel">-</p>
+            </div>
+            <button class="btn btn-ghost" onclick="toggleCustomerOverview()" style="background:#e5e7eb; color:#374151; font-size:1.2rem; padding:4px 10px;">&#10005;</button>
+        </div>
+        <div id="customerOverviewBody"></div>
     </div>
 
     <!-- Hour Type Selection -->
@@ -454,6 +467,7 @@
 <script src="js/customer-config.js"></script>
 <script src="js/utils.js"></script>
 <script src="js/jobs.js"></script>
+<script src="js/customer-overview.js"></script>
 <script src="js/calendar.js"></script>
 <script src="js/git.js"></script>
 <script src="js/moneybird.js"></script>

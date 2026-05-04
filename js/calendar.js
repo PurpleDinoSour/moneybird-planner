@@ -157,6 +157,10 @@ function renderCalendar(forceRecompute) {
     }
     updateCounter();
     renderMonthSummary(year, month);
+    // Refresh overview if visible
+    if (document.getElementById('customerOverviewPanel') && document.getElementById('customerOverviewPanel').style.display !== 'none') {
+        renderCustomerOverview();
+    }
 }
 
 function renderMonthSummary(year, month) {

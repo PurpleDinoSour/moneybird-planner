@@ -550,6 +550,7 @@ function renderJobsList() {
             '<div class="job-card-details">' +
                 '<span>' + dayNames.join(', ') + '</span>' +
                 '<span> &middot; ' + totalWeeklyHours.toFixed(0) + 'h/week</span>' +
+                (job.hourlyRate ? '<span> &middot; \u20AC' + job.hourlyRate.toFixed(2).replace('.', ',') + '/h</span>' : '') +
                 (job.projectName ? '<br><span style="opacity:0.7;">' + escapeHtml(job.projectName) + '</span>' : '') +
             '</div>' +
         '</div>';
@@ -597,6 +598,11 @@ function openJobEditor(jobId) {
     // Project
     html += '<div class="editor-field"><label>Project</label>';
     html += '<div id="jobEditorProjectPicker" class="project-picker"><span class="text-sm text-muted">Loading...</span></div></div>';
+
+    // Hourly Rate
+    html += '<div class="editor-field"><label>Hourly Rate (excl. BTW)</label>';
+    html += '<div style="display:flex; align-items:center; gap:6px;"><span style="font-weight:600; color:var(--muted);">\u20AC</span>';
+    html += '<input type="number" id="jobEditorRate" value="' + (job.hourlyRate || 0) + '" min="0" step="0.50" style="width:120px;" placeholder="112.00"></div></div>';
 
     // Description
     html += '<div class="editor-field"><label>Description (for invoice)</label>';
@@ -719,6 +725,7 @@ function saveJobFromEditor(jobId, isNew) {
     var projectName = projectBtn ? projectBtn.dataset.projectName : '';
 
     var description = document.getElementById('jobEditorDesc').value.trim() || 'Consultancy uren';
+    var hourlyRate = parseFloat(document.getElementById('jobEditorRate').value) || 0;
 
     // Build schedule from selected days + time inputs
     var schedule = {};
@@ -747,6 +754,7 @@ function saveJobFromEditor(jobId, isNew) {
             projectId: projectId,
             projectName: projectName,
             description: description,
+            hourlyRate: hourlyRate,
             schedule: schedule,
             dateOverrides: {}
         });
@@ -758,6 +766,7 @@ function saveJobFromEditor(jobId, isNew) {
             existing.projectId = projectId;
             existing.projectName = projectName;
             existing.description = description;
+            existing.hourlyRate = hourlyRate;
             existing.schedule = schedule;
         }
     }
