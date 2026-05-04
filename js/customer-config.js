@@ -1,5 +1,5 @@
 // Customer Configuration Manager
-// Handles loading/saving local customer profiles (names, colors)
+// Handles loading/saving shared customer profiles (names, colors only)
 
 const CUSTOMER_CONFIG = {
     ENDPOINT_LOAD: '/api/config/customers',
@@ -8,9 +8,10 @@ const CUSTOMER_CONFIG = {
 };
 
 let customersData = [];
+let customersLastModified = null;
 
 /**
- * Load customer configs from server (reads from local customer-config.json)
+ * Load customer configs from server and pull latest shared config from git.
  */
 async function loadCustomerConfigs() {
     try {
@@ -18,21 +19,27 @@ async function loadCustomerConfigs() {
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const data = await response.json();
         customersData = data.customers || [];
+        customersLastModified = data.lastModified || null;
         // Cache for offline fallback
-        localStorage.setItem(CUSTOMER_CONFIG.STORAGE_KEY, JSON.stringify(customersData));
+        localStorage.setItem(CUSTOMER_CONFIG.STORAGE_KEY, JSON.stringify({
+            customers: customersData,
+            lastModified: customersLastModified
+        }));
         console.log(`[CUSTOMER_CONFIG] Loaded ${customersData.length} customers`);
         return customersData;
     } catch (err) {
         console.warn(`[CUSTOMER_CONFIG] Load failed, using cache:`, err.message);
         // Fallback to cached data
         const cached = localStorage.getItem(CUSTOMER_CONFIG.STORAGE_KEY);
-        customersData = cached ? JSON.parse(cached) : [];
+        const parsedCache = cached ? JSON.parse(cached) : { customers: [], lastModified: null };
+        customersData = parsedCache.customers || [];
+        customersLastModified = parsedCache.lastModified || null;
         return customersData;
     }
 }
 
 /**
- * Save updated customer configs to server (writes to local customer-config.json)
+ * Save updated customer configs to server and push shared config through git.
  */
 async function saveCustomerConfigs(customers) {
     try {
@@ -41,13 +48,22 @@ async function saveCustomerConfigs(customers) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 customers: customers,
-                lastModified: new Date().toISOString()
+                lastModified: new Date().toISOString(),
+                baseModified: customersLastModified
             })
         });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
         const result = await response.json();
+        if (!response.ok) {
+            throw new Error(result.error || `HTTP ${response.status}`);
+        }
+
         customersData = customers;
-        localStorage.setItem(CUSTOMER_CONFIG.STORAGE_KEY, JSON.stringify(customersData));
+        customersLastModified = new Date().toISOString();
+        localStorage.setItem(CUSTOMER_CONFIG.STORAGE_KEY, JSON.stringify({
+            customers: customersData,
+            lastModified: customersLastModified
+        }));
         console.log(`[CUSTOMER_CONFIG] Saved ${customers.length} customers`);
         return result;
     } catch (err) {
@@ -128,7 +144,7 @@ async function initializeCustomerUI() {
 function renderCustomersList(customers) {
     const container = document.getElementById('customersList');
     if (!container) return;
-    
+
     if (customers.length === 0) {
         container.innerHTML = '<p style="padding:20px; text-align:center; color:var(--muted);">No customers yet. Add one above.</p>';
         return;
@@ -195,4 +211,3 @@ async function deleteCustomerUI(id) {
         alert(`Error deleting customer: ${err.message}`);
     }
 }
-

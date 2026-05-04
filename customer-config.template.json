@@ -1,11 +1,11 @@
 {
-  "customers": [
-    {
-      "id": "customer-1",
-      "name": "Example Customer",
-      "color": "#3b82f6",
-      "enabled": true
-    }
-  ],
-  "lastModified": "2026-05-04T00:00:00Z"
+    "customers": [
+        {
+            "id": "customer-1",
+            "name": "Example Customer",
+            "color": "#3b82f6",
+            "enabled": true
+        }
+    ],
+    "lastModified": "2026-05-04T00:00:00Z"
 }

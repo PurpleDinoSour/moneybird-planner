@@ -57,36 +57,76 @@ function Get-MimeType {
     return "application/octet-stream"
 }
 
+function Invoke-GitCustomerConfigSync {
+    param(
+        [string[]]$Arguments
+    )
+
+    $output = & git -C $scriptDir @Arguments 2>&1
+    $exitCode = $LASTEXITCODE
+    return @{
+        Success  = ($exitCode -eq 0)
+        Output   = ($output -join "`n")
+        ExitCode = $exitCode
+    }
+}
+
 function Get-CustomerConfig {
-    $configFile = Join-Path $scriptDir "customer-config.json"
-    if (-not (Test-Path $configFile)) {
-        $templateFile = Join-Path $scriptDir "customer-config.template.json"
-        if (Test-Path $templateFile) {
-            Copy-Item -Path $templateFile -Destination $configFile -Force
-            Write-Host "Created customer-config.json from template" -ForegroundColor Yellow
+    $configFile = Join-Path $scriptDir "customer-config.template.json"
+    if (Test-Path (Join-Path $scriptDir ".git")) {
+        $pullResult = Invoke-GitCustomerConfigSync -Arguments @("pull", "--ff-only", "origin", "main")
+        if ($pullResult.Success) {
+            Write-Host "Synced shared customer config from origin/main" -ForegroundColor Green
         } else {
-            return @{ customers = @() }
+            Write-Host "Customer config pull skipped: $($pullResult.Output)" -ForegroundColor Yellow
         }
+    }
+    if (-not (Test-Path $configFile)) {
+        return @{ customers = @(); lastModified = $null }
     }
     try {
         $content = Get-Content -Path $configFile -Raw
         return $content | ConvertFrom-Json
     } catch {
-        Write-Host "Error reading customer-config.json: $_" -ForegroundColor Red
-        return @{ customers = @() }
+        Write-Host "Error reading customer-config.template.json: $_" -ForegroundColor Red
+        return @{ customers = @(); lastModified = $null }
     }
 }
 
 function Set-CustomerConfig {
     param($data)
-    $configFile = Join-Path $scriptDir "customer-config.json"
+
+    $configFile = Join-Path $scriptDir "customer-config.template.json"
     try {
         $json = $data | ConvertTo-Json -Depth 3
         Set-Content -Path $configFile -Value $json -Force
-        Write-Host "Saved customer-config.json" -ForegroundColor Green
-        return @{ success = $true }
+
+        $addResult = Invoke-GitCustomerConfigSync -Arguments @("add", "customer-config.template.json")
+        if (-not $addResult.Success) {
+            return @{ success = $false; error = "Unable to stage shared customer config" }
+        }
+
+        & git -C $scriptDir diff --cached --quiet -- "customer-config.template.json"
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "Shared customer config unchanged" -ForegroundColor Yellow
+            return @{ success = $true; synced = $true; changed = $false }
+        }
+
+        $commitMessage = "chore(customer-config): sync shared customer profiles"
+        $commitResult = Invoke-GitCustomerConfigSync -Arguments @("commit", "-m", $commitMessage, "--", "customer-config.template.json")
+        if (-not $commitResult.Success) {
+            return @{ success = $false; error = "Unable to commit shared customer config"; details = $commitResult.Output }
+        }
+
+        $pushResult = Invoke-GitCustomerConfigSync -Arguments @("push", "origin", "main")
+        if (-not $pushResult.Success) {
+            return @{ success = $false; error = "Saved locally but push failed. Open the repo and resolve git sync."; details = $pushResult.Output }
+        }
+
+        Write-Host "Saved and pushed shared customer config" -ForegroundColor Green
+        return @{ success = $true; synced = $true; changed = $true }
     } catch {
-        Write-Host "Error saving customer-config.json: $_" -ForegroundColor Red
+        Write-Host "Error saving customer-config.template.json: $_" -ForegroundColor Red
         return @{ success = $false; error = $_.Exception.Message }
     }
 }
@@ -473,7 +513,11 @@ try {
                     $data = $body | ConvertFrom-Json
                     $result = Set-CustomerConfig $data
                     $json = $result | ConvertTo-Json -Depth 3
-                    $response.StatusCode = 200
+                    $response.StatusCode = if ($result.success) {
+                        200 
+                    } else {
+                        409 
+                    }
                 } catch {
                     Write-Host "Error processing customer config save: $_" -ForegroundColor Red
                     $json = @{ success = $false; error = $_.Exception.Message } | ConvertTo-Json

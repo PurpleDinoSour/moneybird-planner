@@ -6,6 +6,11 @@ function init() {
     // Load configuration from localStorage
     loadConfig();
 
+    // Pull shared customer profiles on startup.
+    loadCustomerConfigs().catch(error => {
+        console.warn('[CUSTOMER_CONFIG] Startup sync failed:', error.message);
+    });
+
     // Set current month
     const now = new Date();
     document.getElementById('monthPicker').value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
