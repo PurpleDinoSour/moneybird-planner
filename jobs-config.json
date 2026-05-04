@@ -31,7 +31,7 @@
                  {
                      "id":  "job_1777895581765",
                      "name":  "DNB",
-                     "color":  "#06b6d4",
+                     "color":  "#8b5cf6",
                      "projectId":  "483870075814676273",
                      "projectName":  "DNB",
                      "description":  "Consultancy uren",
@@ -69,5 +69,5 @@
                                        }
                  }
              ],
-    "lastModified":  "2026-05-04T12:12:12.036Z"
+    "lastModified":  "2026-05-04T12:12:17.123Z"
 }
