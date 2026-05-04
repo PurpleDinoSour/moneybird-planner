@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🐦 Moneybird Planner IV</title>
+    <!-- Google Fonts - Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Application Styles -->
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<div class="container">
+    <!-- Header -->
+    <div class="header">
+        <div>
+            <h1>🐦 Moneybird Planner IV</h1>
+            <p class="text-sm text-muted" style="margin:4px 0 0 0;">Hour registration with Git integration</p>
+        </div>
+        <div class="header-actions">
+            <button class="btn btn-ghost" onclick="openSettings()" style="background:#e5e7eb; color:var(--text);">⚙️ Settings</button>
+        </div>
+    </div>
+
+    <!-- Hour Type Selection -->
+    <div class="hour-type-tabs">
+        <div class="hour-type-tab facturable active" onclick="setHourType('facturable')">
+            <div class="icon">💼</div>
+            <div class="label">Facturable</div>
+            <div class="desc">BV Administration</div>
+        </div>
+        <div class="hour-type-tab wbso" onclick="setHourType('wbso')">
+            <div class="icon">🔬</div>
+            <div class="label">WBSO (R&D)</div>
+            <div class="desc">Holding Administration</div>
+        </div>
+    </div>
+
+    <!-- WBSO Dashboard -->
+    <div class="wbso-dashboard" id="wbsoDashboard">
+        <div class="dashboard-header">
+            <span class="dashboard-title">📊 WBSO Budget</span>
+            <button class="dashboard-refresh" onclick="refreshWbsoDashboard()">🔄 Refresh</button>
+        </div>
+        <div class="dashboard-body">
+            <div class="dashboard-main">
+                <div class="dashboard-big-stat">
+                    <div class="big-stat-label">Spent</div>
+                    <div class="big-stat-value" id="dashSpent">-</div>
+                    <div class="big-stat-sub" id="dashSpentPercent">-% used</div>
+                    <div class="big-stat-sub">of <span id="dashTotal">1210</span>h</div>
+                </div>
+                <div class="dashboard-big-stat">
+                    <div class="big-stat-label">Remaining</div>
+                    <div class="big-stat-value" id="dashRemaining">-</div>
+                    <div class="big-stat-sub" id="dashRemainingPercent">-% left</div>
+                </div>
+            </div>
+            <div class="progress-bar-container">
+                <div class="progress-bar" id="dashProgress" style="width:0%"></div>
+            </div>
+            <div class="progress-labels">
+                <span>0h</span>
+                <span id="dashProgressLabel">0% used</span>
+                <span id="dashTotalLabel">1210h</span>
+            </div>
+            <div class="dashboard-grid">
+                <div class="dashboard-stat">
+                    <div class="stat-label">Year</div>
+                    <div class="stat-value" id="dashYear">-</div>
+                    <div class="stat-detail" id="dashYearDetail">-</div>
+                </div>
+                <div class="dashboard-stat">
+                    <div class="stat-label">Month</div>
+                    <div class="stat-value" id="dashMonth">-</div>
+                    <div class="stat-detail" id="dashMonthDetail">-</div>
+                </div>
+                <div class="dashboard-stat">
+                    <div class="stat-label">Week</div>
+                    <div class="stat-value" id="dashWeek">-</div>
+                    <div class="stat-detail" id="dashWeekDetail">-</div>
+                </div>
+                <div class="dashboard-stat">
+                    <div class="stat-label">Today</div>
+                    <div class="stat-value" id="dashToday">-</div>
+                    <div class="stat-detail" id="dashTodayDetail">-</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Layout -->
+    <div class="main-grid">
+        <!-- Left: Calendar & Git -->
+        <div class="calendar-section">
+            <!-- Month Picker -->
+            <div class="card">
+                <div class="month-picker-row">
+                    <input type="month" id="monthPicker" onchange="renderCalendar()">
+                    <button class="btn btn-secondary" onclick="fetchExistingHours()">📥 Manage Hours</button>
+                    <button class="btn btn-ghost" onclick="fetchOpenHours()" style="background:#fef2f2; color:#dc2626; border:1px solid #fecaca; font-size:0.8rem;">🧹 Open Hours</button>
+                </div>
+
+                <!-- Month Title -->
+                <div id="calendarMonthTitle" style="font-size:0.85rem; font-weight:600; color:var(--text); margin-bottom:8px; text-align:center;"></div>
+
+                <!-- Calendar Grid -->
+                <div class="calendar-grid" id="calendarGridHeader">
+                    <div class="calendar-header">Wk</div>
+                    <div class="calendar-header">Sun</div>
+                    <div class="calendar-header">Mon</div>
+                    <div class="calendar-header">Tue</div>
+                    <div class="calendar-header">Wed</div>
+                    <div class="calendar-header">Thu</div>
+                    <div class="calendar-header">Fri</div>
+                    <div class="calendar-header">Sat</div>
+                </div>
+                <div class="calendar-grid" id="calendarGrid"></div>
+                <div id="monthSummary"></div>
+            </div>
+
+            <!-- Git Section (WBSO only) -->
+            <div class="card git-section" id="gitSection" style="display:none;">
+                <div class="card-header">
+                    <div>
+                        <h3 class="card-title">🔗 Git Activity</h3>
+                        <p class="card-subtitle">Commits & Pull Requests for WBSO</p>
+                    </div>
+                    <div class="git-actions" style="margin:0;">
+                        <button class="btn btn-sm btn-primary" onclick="fetchAllGitData()">🔄 Fetch All</button>
+                        <button class="btn btn-sm btn-ghost" onclick="selectAllGitItems()" style="background:#d1fae5; color:var(--facturable);">✓ All</button>
+                        <button class="btn btn-sm btn-ghost" onclick="deselectAllGitItems()" style="background:#e5e7eb; color:#374151;">✗ None</button>
+                    </div>
+                </div>
+
+                <!-- Combined Git List -->
+                <div class="git-list" id="gitCombinedList" style="max-height:400px;">
+                    <p style="padding:30px; text-align:center; color:var(--muted);">Click "Fetch All" to load commits and PRs</p>
+                </div>
+
+                <!-- WBSO Options -->
+                <div class="mt-4" style="padding:12px; background:#f5f3ff; border-radius:8px;">
+                    <label class="checkbox-label mb-0">
+                        <input type="checkbox" id="matchCommitsToDates" onchange="saveConfig(); updateCommitBasedUI()">
+                        <span>Match commits to their actual dates</span>
+                    </label>
+                    <label class="checkbox-label mb-0" id="onlyDaysWithCommitsLabel">
+                        <input type="checkbox" id="onlyDaysWithCommits" onchange="saveConfig()">
+                        <span>Only register days with commits</span>
+                    </label>
+                    <label class="checkbox-label mb-0" style="padding-top:12px; margin-top:8px; border-top:1px solid #e5e7eb;">
+                        <input type="checkbox" id="oneEntryPerCommit" onchange="saveConfig()" checked>
+                        <span><strong>One entry per commit</strong> (recommended)</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Action Bar - After Git Section -->
+            <div class="action-bar" id="mainActionBar">
+                <span class="status" id="selectionCount">0 days selected</span>
+                <div class="buttons">
+                    <button class="btn btn-ghost" onclick="fetchExistingHours()">📥 Manage</button>
+                    <button class="btn btn-ghost" onclick="clearAll()">Clear</button>
+                    <button class="btn btn-secondary" onclick="previewSelection()">Preview</button>
+                    <button class="btn btn-primary" onclick="startRegistration()">🚀 Register</button>
+                </div>
+            </div>
+
+            <!-- Hours Management (hidden by default) -->
+            <div class="card hours-management" id="hoursManagementSection" style="display:none;">
+                <div class="card-header">
+                    <div>
+                        <h3 class="card-title">📋 Existing Hours</h3>
+                        <p class="card-subtitle" id="hoursCount">0 entries loaded</p>
+                    </div>
+                    <button class="btn btn-ghost" onclick="document.getElementById('hoursManagementSection').style.display='none';" style="background:#e5e7eb; color:#374151;">✕ Close</button>
+                </div>
+                <div class="git-actions">
+                    <button class="btn btn-sm btn-secondary" onclick="selectAllHours()">✓ Select All</button>
+                    <button class="btn btn-sm btn-ghost" onclick="deselectAllHours()" style="background:#e5e7eb; color:#374151;">✗ Deselect</button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteSelectedHours()">🗑️ Delete</button>
+                </div>
+                <div class="hours-list" id="hoursList"></div>
+            </div>
+        </div>
+
+        <!-- Right Sidebar -->
+        <div class="sidebar">
+            <!-- Jobs (Facturable only) -->
+            <div class="card" id="jobsCard">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                    <h4 class="card-title" style="margin:0;">&#128188; Jobs</h4>
+                    <button class="btn btn-sm btn-primary" onclick="openJobEditor()">+ Add</button>
+                </div>
+                <div id="jobsList"></div>
+            </div>
+
+            <!-- Schedule Grid (Facturable only, Excel-like per-date toggles) -->
+            <div class="card" id="scheduleGrid" style="display:none;"></div>
+
+            <!-- Working Hours (WBSO only) -->
+            <div class="card" id="workingHoursCard" style="display:none;">
+                <h4 class="card-title" style="margin:0 0 12px 0;">&#9200; Working Hours</h4>
+                <!-- Facturable: From/To (hidden, kept for backward compat) -->
+                <div id="facturableTimeSettings" style="display:none;">
+                    <div class="row">
+                        <div>
+                            <label>From</label>
+                            <input type="time" id="startTime" value="07:00">
+                        </div>
+                        <div>
+                            <label>To</label>
+                            <input type="time" id="endTime" value="17:00">
+                        </div>
+                    </div>
+                    <label class="checkbox-label" style="margin-top:8px;">
+                        <input type="checkbox" id="lunchBreak" onchange="saveConfig()" checked>
+                        <span>Lunch break (12:00-13:00)</span>
+                    </label>
+                </div>
+                <!-- WBSO: hours per commit -->
+                <div id="wbsoTimeSettings" style="display:none;">
+                    <p class="text-sm text-muted" style="margin:0 0 8px 0;">Adjust individual hours per item in the list</p>
+                    <div style="display:flex; align-items:center; gap:12px;">
+                        <label style="font-size:0.85rem;">Default hours</label>
+                        <input type="number" id="hoursPerCommit" value="1" min="0.25" step="0.25" max="24" style="width:80px;" onchange="saveConfig(); updateTimeNotation();">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Project Picker (WBSO only) -->
+            <div class="card" id="projectPickerCard" style="display:none;">
+                <h4 class="card-title" style="margin:0 0 8px 0;">&#128194; Project</h4>
+                <div id="projectPicker" class="project-picker">
+                    <span class="text-sm text-muted">Loading projects...</span>
+                </div>
+            </div>
+
+            <!-- Description -->
+            <div class="card">
+                <h4 class="card-title" style="margin:0 0 12px 0;">&#128221; Description</h4>
+                <input type="text" id="desc" placeholder="Description for invoice">
+                <textarea id="wbsoComment" rows="3" placeholder="Additional R&amp;D comments (WBSO only)" style="margin-top:10px; display:none;"></textarea>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Settings Modal -->
+<div id="settingsModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:1000; padding:20px; overflow-y:auto;">
+    <div style="max-width:700px; margin:40px auto; background:var(--card); border-radius:16px; padding:24px; box-shadow:var(--shadow-lg);">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+            <h2 style="margin:0;">⚙️ Settings</h2>
+            <button onclick="closeSettings()" style="background:none; border:none; font-size:1.5rem; cursor:pointer;">×</button>
+        </div>
+
+        <!-- BV Settings -->
+        <div style="background:#f0fdf4; padding:16px; border-radius:10px; margin-bottom:16px;">
+            <h3 style="margin:0 0 12px 0; color:var(--facturable);">💼 BV Administration (Facturable)</h3>
+            <div class="row">
+                <div>
+                    <label>API Token</label>
+                    <input type="password" id="apiTokenBV" onchange="saveConfig()">
+                </div>
+                <div>
+                    <label>Admin ID</label>
+                    <input type="text" id="adminIdBV" onchange="saveConfig()">
+                </div>
+            </div>
+            <div class="row">
+                <div>
+                    <label>User ID</label>
+                    <div style="display:flex; gap:8px;">
+                        <input type="text" id="userIdBV" onchange="saveConfig()" style="flex:1;">
+                        <button class="btn btn-sm btn-primary" onclick="fetchUsers('bv')">Find</button>
+                    </div>
+                </div>
+                <div>
+                    <label>Project ID (optional)</label>
+                    <div style="display:flex; gap:8px;">
+                        <input type="text" id="projectIdBV" onchange="saveConfig()" style="flex:1;">
+                        <button class="btn btn-sm btn-secondary" onclick="fetchProjects('bv')">Find</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Holding Settings -->
+        <div style="background:#faf5ff; padding:16px; border-radius:10px; margin-bottom:16px;">
+            <h3 style="margin:0 0 12px 0; color:var(--wbso);">🔬 Holding Administration (WBSO)</h3>
+            <div class="row">
+                <div>
+                    <label>API Token</label>
+                    <input type="password" id="apiTokenHolding" onchange="saveConfig()">
+                </div>
+                <div>
+                    <label>Admin ID</label>
+                    <input type="text" id="adminIdHolding" onchange="saveConfig()">
+                </div>
+            </div>
+            <div class="row">
+                <div>
+                    <label>User ID</label>
+                    <div style="display:flex; gap:8px;">
+                        <input type="text" id="userIdHolding" onchange="saveConfig()" style="flex:1;">
+                        <button class="btn btn-sm btn-primary" onclick="fetchUsers('holding')">Find</button>
+                    </div>
+                </div>
+                <div>
+                    <label>WBSO Project ID</label>
+                    <div style="display:flex; gap:8px;">
+                        <input type="text" id="projectIdHolding" onchange="saveConfig()" style="flex:1;">
+                        <button class="btn btn-sm btn-secondary" onclick="fetchProjects('holding')">Find</button>
+                    </div>
+                </div>
+            </div>
+            <label class="checkbox-label" style="margin-top:8px;">
+                <input type="checkbox" id="wbsoBillable" onchange="saveConfig()">
+                <span>Declarabel (mark WBSO hours as billable)</span>
+            </label>
+            <div style="margin-top:12px; padding-top:12px; border-top:1px solid #e9d5ff;">
+                <label>WBSO Budget (total hours)</label>
+                <input type="number" id="wbsoBudget" value="1210" min="0" step="1" onchange="saveConfig(); renderWbsoDashboard()" style="width:120px;">
+                <p class="text-sm text-muted" style="margin:4px 0 0 0;">Total hours allocated for WBSO period</p>
+            </div>
+        </div>
+
+        <!-- Git Settings -->
+        <div style="background:#eff6ff; padding:16px; border-radius:10px; margin-bottom:16px;">
+            <h3 style="margin:0 0 12px 0; color:#3b82f6;">🔗 Git Integration</h3>
+            <div class="row">
+                <div>
+                    <label>Source</label>
+                    <select id="gitSource" onchange="saveConfig(); updateGitSourceUI()">
+                        <option value="github">GitHub</option>
+                        <option value="azuredevops">Azure DevOps</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- GitHub Settings -->
+            <div id="githubSettings">
+                <div class="row">
+                    <div>
+                        <label>GitHub Token (optional)</label>
+                        <input type="password" id="githubToken" onchange="saveConfig()" placeholder="ghp_xxxx...">
+                    </div>
+                    <div>
+                        <label>Repository</label>
+                        <input type="text" id="githubRepo" onchange="saveConfig()" placeholder="owner/repo">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Azure DevOps Settings -->
+            <div id="azureDevOpsSettings" style="display:none;">
+                <div class="row">
+                    <div>
+                        <label>Auth Method</label>
+                        <select id="azureAuthMethod" onchange="saveConfig(); updateAzureAuthUI()">
+                            <option value="pat">PAT Token Only</option>
+                            <option value="basic">Username + PAT</option>
+                            <option value="password">Username + Password</option>
+                        </select>
+                    </div>
+                    <div id="azureUsernameCol" style="display:none;">
+                        <label>Username / Email</label>
+                        <input type="text" id="azureUsername" onchange="saveConfig()">
+                    </div>
+                </div>
+                <div class="row">
+                    <div id="azureTokenCol">
+                        <label id="azureTokenLabel">PAT Token</label>
+                        <input type="password" id="azureToken" onchange="saveConfig()">
+                    </div>
+                    <div id="azurePasswordCol" style="display:none;">
+                        <label>Password</label>
+                        <input type="password" id="azurePassword" onchange="saveConfig()">
+                    </div>
+                    <div>
+                        <label>Organization</label>
+                        <input type="text" id="azureOrg" onchange="saveConfig()" placeholder="your-organization">
+                    </div>
+                </div>
+                <div style="margin-top:12px;">
+                    <label>Projects</label>
+                    <div style="display:flex; gap:8px; margin-bottom:8px;">
+                        <button class="btn btn-sm btn-primary" onclick="selectAllProjects()">✓ All</button>
+                        <button class="btn btn-sm btn-ghost" onclick="deselectAllProjects()" style="background:#e5e7eb; color:#374151;">✗ None</button>
+                        <button class="btn btn-sm btn-secondary" onclick="selectDefaultProjects()">⭐ Defaults</button>
+                        <button class="btn btn-sm btn-ghost" onclick="fetchAzureProjects()" style="background:#e5e7eb; color:#374151;">🔄 Fetch</button>
+                    </div>
+                    <div id="azureProjectList" style="max-height:120px; overflow-y:auto; border:1px solid var(--border); border-radius:6px; background:white; padding:8px;">
+                        <label class="checkbox-label mb-0" style="padding:4px 0;">
+                            <input type="checkbox" value="M365DSC_CICD_PRD" onchange="saveConfig()">
+                            <span>M365DSC_CICD_PRD</span>
+                        </label>
+                        <label class="checkbox-label mb-0" style="padding:4px 0;">
+                            <input type="checkbox" value="M365DSC_Data_PRD" onchange="saveConfig()">
+                            <span>M365DSC_Data_PRD</span>
+                        </label>
+                        <label class="checkbox-label mb-0" style="padding:4px 0;">
+                            <input type="checkbox" value="M365DSC_Data_NPRD" onchange="saveConfig()">
+                            <span>M365DSC_Data_NPRD</span>
+                        </label>
+                        <label class="checkbox-label mb-0" style="padding:4px 0;">
+                            <input type="checkbox" value="M365DSC_CICD_NPRD" onchange="saveConfig()">
+                            <span>M365DSC_CICD_NPRD</span>
+                        </label>
+                    </div>
+                </div>
+                <div style="margin-top:12px;">
+                    <label>Filter by Author(s)</label>
+                    <input type="text" id="authorFilter" onchange="saveConfig()" placeholder="e.g. Dimitri Valdivia, Admin">
+                    <p class="text-sm text-muted" style="margin:4px 0 0 0;">Comma-separated names. Leave empty for all.</p>
+                </div>
+                <div style="margin-top:12px;">
+                    <button class="btn btn-secondary" onclick="testAzureConnection()">🔗 Test Connection</button>
+                </div>
+                <div id="azureTestResult" style="margin-top:10px; padding:10px; border-radius:6px; display:none;"></div>
+            </div>
+        </div>
+
+        <!-- Reset -->
+        <div style="text-align:center; padding-top:12px; border-top:1px solid var(--border);">
+            <button class="btn btn-danger" onclick="if(confirm('Clear ALL settings?')) { localStorage.clear(); location.reload(); }">🗑️ Reset All Settings</button>
+        </div>
+    </div>
+</div>
+
+<!-- JavaScript Modules -->
+<script src="js/config.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/jobs.js"></script>
+<script src="js/calendar.js"></script>
+<script src="js/git.js"></script>
+<script src="js/moneybird.js"></script>
+<script src="js/dashboard.js"></script>
+<script src="js/app.js"></script>
+
+</body>
+</html>
