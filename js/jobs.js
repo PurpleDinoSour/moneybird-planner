@@ -1,28 +1,82 @@
 // Moneybird Planner IV - Job Profiles Module
-// Version: 3.0.0
+// Version: 4.0.0
 // Manages multiple concurrent job profiles with weekly templates + per-date overrides
+// Jobs are synced between laptops via git-tracked jobs-config.json
 
-// --- PERSISTENCE ---
+// --- PERSISTENCE (server-synced + localStorage cache) ---
 function saveJobs() {
     var data = JSON.stringify(appState.jobs);
+    // Always cache to localStorage for offline/fast access
     localStorage.setItem(STORAGE_KEYS.JOBS, data);
-    console.log('[Jobs] Saved', appState.jobs.length, 'jobs (' + data.length + ' bytes)');
+    console.log('[Jobs] Cached', appState.jobs.length, 'jobs locally');
+
+    // Push to server (which commits + pushes to git)
+    fetch('/api/config/jobs/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            jobs: appState.jobs,
+            lastModified: new Date().toISOString()
+        })
+    }).then(function(resp) {
+        return resp.json();
+    }).then(function(result) {
+        if (result.success) {
+            console.log('[Jobs] Synced to server' + (result.changed ? ' (pushed)' : ' (unchanged)'));
+        } else {
+            console.warn('[Jobs] Server sync failed:', result.error);
+        }
+    }).catch(function(err) {
+        console.warn('[Jobs] Server sync error:', err.message);
+    });
 }
 
 function loadJobs() {
+    // Try loading from localStorage first (fast, always available)
     var saved = localStorage.getItem(STORAGE_KEYS.JOBS);
     if (saved) {
         try {
             appState.jobs = JSON.parse(saved);
-            console.log('[Jobs] Loaded', appState.jobs.length, 'jobs from localStorage');
+            console.log('[Jobs] Loaded', appState.jobs.length, 'jobs from cache');
         } catch (e) {
-            console.error('[Jobs] Failed to parse jobs:', e);
+            console.error('[Jobs] Failed to parse cached jobs:', e);
             appState.jobs = [];
         }
-        return;
+    } else {
+        console.log('[Jobs] No cached jobs, checking for legacy data...');
+        migrateFromLegacy();
     }
-    console.log('[Jobs] No saved jobs found, checking for legacy data...');
-    migrateFromLegacy();
+}
+
+// Pull shared jobs from server (git pull + read file). Call on startup.
+function loadJobsFromServer() {
+    return fetch('/api/config/jobs')
+        .then(function(resp) {
+            if (!resp.ok) throw new Error('HTTP ' + resp.status);
+            return resp.json();
+        })
+        .then(function(data) {
+            var serverJobs = data.jobs || [];
+            if (serverJobs.length > 0) {
+                appState.jobs = serverJobs;
+                localStorage.setItem(STORAGE_KEYS.JOBS, JSON.stringify(serverJobs));
+                console.log('[Jobs] Synced', serverJobs.length, 'jobs from server');
+                // Re-render UI with synced data
+                renderJobsList();
+                renderScheduleGrid();
+                renderCalendar();
+            } else {
+                console.log('[Jobs] Server has no jobs, keeping local data');
+                // If we have local jobs but server is empty, push ours up
+                if (appState.jobs.length > 0) {
+                    console.log('[Jobs] Pushing local jobs to server...');
+                    saveJobs();
+                }
+            }
+        })
+        .catch(function(err) {
+            console.warn('[Jobs] Server load failed, using cache:', err.message);
+        });
 }
 
 function migrateFromLegacy() {

@@ -57,7 +57,7 @@ function Get-MimeType {
     return "application/octet-stream"
 }
 
-function Invoke-GitCustomerConfigSync {
+function Invoke-GitSync {
     param(
         [string[]]$Arguments
     )
@@ -74,7 +74,7 @@ function Invoke-GitCustomerConfigSync {
 function Get-CustomerConfig {
     $configFile = Join-Path $scriptDir "customer-config.template.json"
     if (Test-Path (Join-Path $scriptDir ".git")) {
-        $pullResult = Invoke-GitCustomerConfigSync -Arguments @("pull", "--ff-only", "origin", "main")
+        $pullResult = Invoke-GitSync -Arguments @("pull", "--ff-only", "origin", "main")
         if ($pullResult.Success) {
             Write-Host "Synced shared customer config from origin/main" -ForegroundColor Green
         } else {
@@ -101,7 +101,7 @@ function Set-CustomerConfig {
         $json = $data | ConvertTo-Json -Depth 3
         Set-Content -Path $configFile -Value $json -Force
 
-        $addResult = Invoke-GitCustomerConfigSync -Arguments @("add", "customer-config.template.json")
+        $addResult = Invoke-GitSync -Arguments @("add", "customer-config.template.json")
         if (-not $addResult.Success) {
             return @{ success = $false; error = "Unable to stage shared customer config" }
         }
@@ -113,12 +113,12 @@ function Set-CustomerConfig {
         }
 
         $commitMessage = "chore(customer-config): sync shared customer profiles"
-        $commitResult = Invoke-GitCustomerConfigSync -Arguments @("commit", "-m", $commitMessage, "--", "customer-config.template.json")
+        $commitResult = Invoke-GitSync -Arguments @("commit", "-m", $commitMessage, "--", "customer-config.template.json")
         if (-not $commitResult.Success) {
             return @{ success = $false; error = "Unable to commit shared customer config"; details = $commitResult.Output }
         }
 
-        $pushResult = Invoke-GitCustomerConfigSync -Arguments @("push", "origin", "main")
+        $pushResult = Invoke-GitSync -Arguments @("push", "origin", "main")
         if (-not $pushResult.Success) {
             return @{ success = $false; error = "Saved locally but push failed. Open the repo and resolve git sync."; details = $pushResult.Output }
         }
@@ -127,6 +127,66 @@ function Set-CustomerConfig {
         return @{ success = $true; synced = $true; changed = $true }
     } catch {
         Write-Host "Error saving customer-config.template.json: $_" -ForegroundColor Red
+        return @{ success = $false; error = $_.Exception.Message }
+    }
+}
+
+function Get-JobsConfig {
+    $configFile = Join-Path $scriptDir "jobs-config.json"
+    if (Test-Path (Join-Path $scriptDir ".git")) {
+        $pullResult = Invoke-GitSync -Arguments @("pull", "--ff-only", "origin", "main")
+        if ($pullResult.Success) {
+            Write-Host "Synced shared jobs config from origin/main" -ForegroundColor Green
+        } else {
+            Write-Host "Jobs config pull skipped: $($pullResult.Output)" -ForegroundColor Yellow
+        }
+    }
+    if (-not (Test-Path $configFile)) {
+        return @{ jobs = @(); lastModified = $null }
+    }
+    try {
+        $content = Get-Content -Path $configFile -Raw
+        return $content | ConvertFrom-Json
+    } catch {
+        Write-Host "Error reading jobs-config.json: $_" -ForegroundColor Red
+        return @{ jobs = @(); lastModified = $null }
+    }
+}
+
+function Set-JobsConfig {
+    param($data)
+
+    $configFile = Join-Path $scriptDir "jobs-config.json"
+    try {
+        $json = $data | ConvertTo-Json -Depth 10
+        Set-Content -Path $configFile -Value $json -Force
+
+        $addResult = Invoke-GitSync -Arguments @("add", "jobs-config.json")
+        if (-not $addResult.Success) {
+            return @{ success = $false; error = "Unable to stage shared jobs config" }
+        }
+
+        & git -C $scriptDir diff --cached --quiet -- "jobs-config.json"
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "Shared jobs config unchanged" -ForegroundColor Yellow
+            return @{ success = $true; synced = $true; changed = $false }
+        }
+
+        $commitMessage = "chore(jobs-config): sync shared job profiles"
+        $commitResult = Invoke-GitSync -Arguments @("commit", "-m", $commitMessage, "--", "jobs-config.json")
+        if (-not $commitResult.Success) {
+            return @{ success = $false; error = "Unable to commit shared jobs config"; details = $commitResult.Output }
+        }
+
+        $pushResult = Invoke-GitSync -Arguments @("push", "origin", "main")
+        if (-not $pushResult.Success) {
+            return @{ success = $false; error = "Saved locally but push failed. Open the repo and resolve git sync."; details = $pushResult.Output }
+        }
+
+        Write-Host "Saved and pushed shared jobs config" -ForegroundColor Green
+        return @{ success = $true; synced = $true; changed = $true }
+    } catch {
+        Write-Host "Error saving jobs-config.json: $_" -ForegroundColor Red
         return @{ success = $false; error = $_.Exception.Message }
     }
 }
@@ -520,6 +580,43 @@ try {
                     }
                 } catch {
                     Write-Host "Error processing customer config save: $_" -ForegroundColor Red
+                    $json = @{ success = $false; error = $_.Exception.Message } | ConvertTo-Json
+                    $response.StatusCode = 400
+                }
+            } else {
+                $response.StatusCode = 405
+                $json = '{"error":"Only POST allowed"}'
+            }
+            $buffer = [System.Text.Encoding]::UTF8.GetBytes($json)
+            $response.ContentType = "application/json"
+            $response.ContentLength64 = $buffer.Length
+            $response.OutputStream.Write($buffer, 0, $buffer.Length)
+        } elseif ($requestedFile -eq "api/config/jobs") {
+            # GET jobs config
+            $config = Get-JobsConfig
+            $json = $config | ConvertTo-Json -Depth 10
+            Write-Host "Serving jobs configs" -ForegroundColor Cyan
+            $buffer = [System.Text.Encoding]::UTF8.GetBytes($json)
+            $response.ContentType = "application/json"
+            $response.ContentLength64 = $buffer.Length
+            $response.OutputStream.Write($buffer, 0, $buffer.Length)
+        } elseif ($requestedFile -eq "api/config/jobs/save") {
+            # POST to save jobs config
+            if ($request.HttpMethod -eq "POST") {
+                $reader = New-Object System.IO.StreamReader($request.InputStream)
+                $body = $reader.ReadToEnd()
+                $reader.Close()
+                try {
+                    $data = $body | ConvertFrom-Json
+                    $result = Set-JobsConfig $data
+                    $json = $result | ConvertTo-Json -Depth 3
+                    $response.StatusCode = if ($result.success) {
+                        200 
+                    } else {
+                        409 
+                    }
+                } catch {
+                    Write-Host "Error processing jobs config save: $_" -ForegroundColor Red
                     $json = @{ success = $false; error = $_.Exception.Message } | ConvertTo-Json
                     $response.StatusCode = 400
                 }
