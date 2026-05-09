@@ -66,10 +66,11 @@
                      "dateOverrides":  {
                                            "2026-05-06":  false,
                                            "2026-05-25":  false,
-                                           "2026-05-14":  false
+                                           "2026-05-14":  false,
+                                           "2026-05-01":  false
                                        },
                      "hourlyRate":  107.5
                  }
              ],
-    "lastModified":  "2026-05-09T13:15:12.750Z"
+    "lastModified":  "2026-05-09T13:44:21.370Z"
 }
