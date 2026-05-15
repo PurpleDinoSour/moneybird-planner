@@ -1133,9 +1133,35 @@ label {
     font-size: 0.85rem;
     width: 100px;
     background: #FFFFFF;
-    color: var(--text);
+    color: #0f172a;
     color-scheme: light;
 }
+.he-row input[type="time"]:focus {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}
+.he-row label.he-checkbox {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text);
+    font-size: 0.8rem;
+}
+.he-actions .btn {
+    padding: 4px 12px;
+    font-size: 0.78rem;
+    border-radius: 6px;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    font-weight: 600;
+}
+.he-actions .btn:hover { border-color: var(--accent); color: var(--text); }
+.he-actions .btn-primary { background: var(--accent); color: #061a0d; border-color: var(--accent); }
+.he-actions .btn-primary:hover { filter: brightness(1.05); }
+.he-actions .btn-danger { color: #fca5a5; border-color: rgba(239, 68, 68, 0.4); }
+.he-actions .btn-danger:hover { background: rgba(239, 68, 68, 0.1); border-color: #ef4444; color: #fecaca; }
 .he-hours {
     font-weight: 700;
     font-size: 0.9rem;
@@ -2460,3 +2486,21 @@ body.wbso-mode .tab.active { background: var(--wbso); border-color: var(--wbso);
     margin-left: 6px;
     font-weight: 800;
 }
+
+/* Diff modal: Fix button (resolve conflict in-place) */
+.diff-action { white-space: nowrap; text-align: right; padding: 4px 8px; }
+.diff-fix-btn {
+    background: var(--warning, #f59e0b);
+    color: #1a1300;
+    border: 1px solid transparent;
+    padding: 4px 12px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: filter 0.12s ease;
+}
+.diff-fix-btn:hover { filter: brightness(1.1); }
+.diff-fix-btn:disabled { opacity: 0.6; cursor: progress; filter: none; }

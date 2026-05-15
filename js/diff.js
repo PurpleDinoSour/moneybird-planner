@@ -90,6 +90,7 @@
                     return {
                         status: 'conflict',
                         match: e,
+                        matches: sameProjectEntries.slice(),
                         reason: 'Hours differ: planned ' + (plannedH != null ? plannedH.toFixed(1) : '?') + 'h vs registered ' + (eH != null ? eH.toFixed(1) : '?') + 'h'
                     };
                 }
@@ -97,6 +98,7 @@
                     return {
                         status: 'conflict',
                         match: e,
+                        matches: sameProjectEntries.slice(),
                         reason: sameProjectEntries.length + ' entries already exist on this project for this date'
                     };
                 }
@@ -106,7 +108,7 @@
 
         // Same project, different description -> conflict (would create duplicate).
         if (sameProjectEntries.length > 0) {
-            return { status: 'conflict', match: sameProjectEntries[0], reason: 'Existing entry on this project with a different description' };
+            return { status: 'conflict', match: sameProjectEntries[0], matches: sameProjectEntries.slice(), reason: 'Existing entry on this project with a different description' };
         }
 
         // Different project on same date is allowed (split day) -> still new.
@@ -210,6 +212,9 @@
         return 'CONFLICT';
     }
 
+    // Cache of last-rendered entries indexed for the Fix handler.
+    let lastRendered = [];
+
     function renderRows(entries) {
         // Sort: conflict first, then new, then existing; date ascending within group.
         const order = { conflict: 0, 'new': 1, existing: 2 };
@@ -217,7 +222,14 @@
             if (order[a.status] !== order[b.status]) return order[a.status] - order[b.status];
             return a.date < b.date ? -1 : a.date > b.date ? 1 : 0;
         });
-        const rows = sorted.map(r => {
+        lastRendered = sorted;
+        const rows = sorted.map((r, i) => {
+            let actionCell = '<td class="diff-action"></td>';
+            if (r.status === 'conflict') {
+                const matchCount = (r.matches && r.matches.length) || (r.match ? 1 : 0);
+                const label = matchCount > 1 ? 'Fix (' + matchCount + ')' : 'Fix';
+                actionCell = '<td class="diff-action"><button type="button" class="diff-fix-btn" data-fix-idx="' + i + '" title="Delete existing entries on this project + register the planned one">' + label + '</button></td>';
+            }
             return [
                 '<tr class="diff-row diff-row-' + r.status + '">',
                 '  <td class="diff-status"><span class="diff-pill diff-pill-' + r.status + '">' + statusLabel(r.status) + '</span></td>',
@@ -226,17 +238,94 @@
                 '  <td class="diff-time">' + escapeHtml((r.startTime || '') + ' - ' + (r.endTime || '')) + '</td>',
                 '  <td class="diff-desc">' + escapeHtml(r.description || '') + '</td>',
                 '  <td class="diff-reason">' + escapeHtml(r.reason || '') + '</td>',
+                actionCell,
                 '</tr>'
             ].join('');
         }).join('');
         return [
             '<table class="diff-table">',
             '  <thead><tr>',
-            '    <th>Status</th><th>Date</th><th>Job</th><th>Time</th><th>Description</th><th>Why</th>',
+            '    <th>Status</th><th>Date</th><th>Job</th><th>Time</th><th>Description</th><th>Why</th><th></th>',
             '  </tr></thead>',
             '  <tbody>' + rows + '</tbody>',
             '</table>'
         ].join('');
+    }
+
+    // Resolve a single conflict row by index into lastRendered.
+    // Strategy: DELETE all matching existing entries on the same project + date
+    // (skip invoice-locked), then POST the planned entry.
+    async function fixConflict(idx, allPlannedEntries) {
+        const row = lastRendered[idx];
+        if (!row || row.status !== 'conflict') return;
+        if (typeof getCurrentConfig !== 'function' || typeof registerSingleEntry !== 'function') {
+            alert('Moneybird helpers not loaded.');
+            return;
+        }
+        const config = getCurrentConfig();
+        if (!config.token || !config.adminId) {
+            alert('Configure Moneybird API first.');
+            return;
+        }
+        const matches = (row.matches && row.matches.length) ? row.matches : (row.match ? [row.match] : []);
+        const msg = 'Resolve conflict on ' + row.date + ' (' + (row.jobName || 'no job') + '):\n\n'
+            + '- Delete ' + matches.length + ' existing entr' + (matches.length === 1 ? 'y' : 'ies') + ' on this project\n'
+            + '- Register planned ' + (row.startTime || '') + '-' + (row.endTime || '') + '\n\n'
+            + 'Continue?';
+        if (!confirm(msg)) return;
+
+        let deleted = 0, locked = 0, delFailed = 0;
+        for (const m of matches) {
+            try {
+                const resp = await fetch(CONFIG.API_BASE_URL + '/moneybird/' + config.adminId + '/time_entries/' + m.id, {
+                    method: 'DELETE',
+                    headers: { 'X-Moneybird-Token': config.token }
+                });
+                if (resp.ok || resp.status === 204) {
+                    deleted++;
+                } else {
+                    const body = await resp.json().catch(() => ({}));
+                    if (body.symbolic && (body.symbolic.id === 'cannot_destroy' || body.symbolic.id === 'forbidden')) {
+                        locked++;
+                    } else {
+                        delFailed++;
+                    }
+                }
+            } catch (e) {
+                console.error('[fix] delete failed:', e);
+                delFailed++;
+            }
+        }
+
+        if (locked > 0 || delFailed > 0) {
+            alert('Partial: ' + deleted + ' deleted, ' + locked + ' locked (linked to invoice), ' + delFailed + ' failed.\n\nLocked entries must be unlinked from their invoice in Moneybird first.');
+        }
+
+        try {
+            await registerSingleEntry(config, row.date, row.description, null, null, {
+                startTime: row.startTime,
+                endTime: row.endTime,
+                lunch: row.lunch,
+                projectId: row.projectId
+            });
+        } catch (e) {
+            console.error('[fix] register failed:', e);
+            alert('Could not register the planned entry: ' + e.message);
+        }
+
+        // Re-fetch + re-classify so the modal reflects the new state.
+        try {
+            const monthKey = document.getElementById('monthPicker').value;
+            const fresh = await fetchMonthEntries(config, monthKey);
+            const planned = allPlannedEntries || [];
+            const newDiff = computeDiff(planned, fresh);
+            document.getElementById('diffModalSummary').innerHTML = renderSummary(newDiff.summary);
+            document.getElementById('diffModalBody').innerHTML = renderRows(newDiff.entries);
+            paintCalendarOverlay(newDiff);
+            window.__diffPlanned = planned;
+        } catch (e) {
+            console.error('[fix] refresh failed:', e);
+        }
     }
 
     function renderSummary(summary) {
@@ -278,6 +367,25 @@
         }
         document.getElementById('diffModalSummary').innerHTML = renderSummary(diff.summary);
         document.getElementById('diffModalBody').innerHTML = renderRows(diff.entries);
+        // Cache planned entries so per-row Fix can re-classify after mutating Moneybird.
+        window.__diffPlanned = diff.entries.map(r => ({
+            date: r.date, description: r.description, startTime: r.startTime,
+            endTime: r.endTime, lunch: r.lunch, projectId: r.projectId, jobName: r.jobName
+        }));
+        // Delegated click handler for Fix buttons (bound once).
+        const body = document.getElementById('diffModalBody');
+        if (body && !body.__fixHandlerBound) {
+            body.addEventListener('click', function (ev) {
+                const btn = ev.target.closest('.diff-fix-btn');
+                if (!btn) return;
+                ev.preventDefault();
+                const idx = parseInt(btn.dataset.fixIdx, 10);
+                btn.disabled = true;
+                btn.textContent = 'Fixing...';
+                fixConflict(idx, window.__diffPlanned).catch(e => console.error(e));
+            });
+            body.__fixHandlerBound = true;
+        }
         const confirmBtn = document.getElementById('diffModalConfirm');
         if (diff.summary.new === 0) {
             confirmBtn.disabled = true;
