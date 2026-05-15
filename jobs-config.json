@@ -62,7 +62,31 @@
                      "dateOverrides":  {
 
                                        }
+                 },
+                 {
+                     "id":  "job_1778867041675",
+                     "name":  "RIVM",
+                     "color":  "#3b82f6",
+                     "projectId":  "478308704970605831",
+                     "projectName":  "Rijksinstituut voor Volksgezondheid en Milieu (RIVM)",
+                     "description":  "Consultancy uren",
+                     "hourlyRate":  112,
+                     "schedule":  {
+                                      "2":  {
+                                                "start":  "07:00",
+                                                "end":  "17:00",
+                                                "lunch":  true
+                                            },
+                                      "5":  {
+                                                "start":  "07:00",
+                                                "end":  "17:00",
+                                                "lunch":  true
+                                            }
+                                  },
+                     "dateOverrides":  {
+
+                                       }
                  }
              ],
-    "lastModified":  "2026-05-15T17:43:59.776Z"
+    "lastModified":  "2026-05-15T17:44:49.801Z"
 }
