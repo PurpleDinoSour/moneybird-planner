@@ -401,7 +401,7 @@ function renderHoursList() {
     });
 
     // Summary header
-    var summaryHtml = '<div style="padding:12px 16px;background:var(--bg-elevated,#111827);border-radius:8px;margin-bottom:12px;border:1px solid var(--border,#334155);">';
+    var summaryHtml = '<div style="padding:12px 16px;background:var(--bg-elevated,#F8FAFC);border-radius:8px;margin-bottom:12px;border:1px solid var(--border,#E2E8F0);">';
     summaryHtml += '<div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;">';
     summaryHtml += '<div><strong>' + appState.fetchedEntries.length + '</strong> entries</div>';
     summaryHtml += '<div><strong>' + Object.keys(dayMap).length + '</strong> days</div>';
@@ -428,7 +428,7 @@ function renderHoursList() {
         missing = selectedDates.filter(function(d) { return !existingDates.has(d); });
         extra = Array.from(existingDates).filter(function(d) { return !appState.selectedDates.has(d); }).sort();
 
-        summaryHtml += '<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border,#e5e7eb);font-size:0.85rem;">';
+        summaryHtml += '<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border,#E2E8F0);font-size:0.85rem;">';
         summaryHtml += '<strong>Calendar vs Moneybird:</strong> ';
         if (missing.length === 0 && extra.length === 0) {
             summaryHtml += '<span style="color:var(--success,#22c55e);">All ' + selectedDates.length + ' selected days match Moneybird</span>';
@@ -686,7 +686,7 @@ function renderOpenHoursList() {
         var parts = monthKey.split('-');
         var label = monthNames[parseInt(parts[1]) - 1] + ' ' + parts[0];
 
-        html += '<div style="margin-top:12px;padding:6px 12px;background:var(--bg-elevated,#111827);border-radius:6px;font-weight:600;font-size:0.85rem;display:flex;justify-content:space-between;">';
+        html += '<div style="margin-top:12px;padding:6px 12px;background:var(--bg-elevated,#F8FAFC);border-radius:6px;font-weight:600;font-size:0.85rem;display:flex;justify-content:space-between;">';
         html += '<span>' + label + '</span>';
         html += '<span>' + group.entries.length + ' entries / ' + group.hours.toFixed(1) + 'h</span>';
         html += '</div>';
@@ -720,7 +720,7 @@ function showPickerModal(title, items) {
         overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:10000;display:flex;align-items:center;justify-content:center;';
 
         var modal = document.createElement('div');
-        modal.style.cssText = 'background:var(--surface,#1E293B);border:1px solid var(--border,#334155);border-radius:12px;padding:24px;min-width:360px;max-width:500px;max-height:80vh;display:flex;flex-direction:column;color:var(--text,#F1F5F9);';
+        modal.style.cssText = 'background:var(--surface,#FFFFFF);border:1px solid var(--border,#E2E8F0);border-radius:12px;padding:24px;min-width:360px;max-width:500px;max-height:80vh;display:flex;flex-direction:column;color:var(--text,#0F172A);box-shadow:0 20px 40px -12px rgba(15,23,42,0.18);';
 
         var heading = document.createElement('h3');
         heading.textContent = title;
@@ -770,7 +770,7 @@ function showPickerModal(title, items) {
 
         var cancelBtn = document.createElement('button');
         cancelBtn.textContent = 'Cancel';
-        cancelBtn.style.cssText = 'padding:8px 20px;border:1px solid var(--border,#444);border-radius:6px;background:transparent;color:var(--text,#cdd6f4);cursor:pointer;align-self:flex-end;';
+        cancelBtn.style.cssText = 'padding:8px 20px;border:1px solid var(--border,#E2E8F0);border-radius:6px;background:transparent;color:var(--text-secondary,#475569);cursor:pointer;align-self:flex-end;';
         cancelBtn.onclick = function() {
             document.body.removeChild(overlay);
             resolve(null);
@@ -1010,8 +1010,8 @@ function renderConceptInvoicesList() {
         var invoiceDate = inv.invoice_date || inv.created_at || '';
         if (invoiceDate && invoiceDate.length > 10) invoiceDate = invoiceDate.substring(0, 10);
 
-        html += '<div style="border:1px solid var(--border,#e5e7eb);border-radius:8px;margin-bottom:8px;overflow:hidden;">';
-        html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--bg-elevated,#111827);cursor:pointer;" onclick="toggleInvoiceDetails(' + idx + ')">';
+        html += '<div style="border:1px solid var(--border,#E2E8F0);border-radius:8px;margin-bottom:8px;overflow:hidden;">';
+        html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--bg-elevated,#F8FAFC);cursor:pointer;" onclick="toggleInvoiceDetails(' + idx + ')">';
         html += '<div>';
         html += '<div style="font-weight:600;font-size:0.9rem;">' + escapeHtml(contactName) + '</div>';
         html += '<div style="font-size:0.78rem;color:var(--muted);">';
@@ -1046,7 +1046,7 @@ function renderConceptInvoicesList() {
                 var hasTimeEntries = detail.time_entry_ids && detail.time_entry_ids.length > 0;
                 var teCount = hasTimeEntries ? detail.time_entry_ids.length : 0;
 
-                html += '<div style="display:flex;align-items:flex-start;gap:8px;padding:6px 0;border-bottom:1px solid var(--border,#334155);">';
+                html += '<div style="display:flex;align-items:flex-start;gap:8px;padding:6px 0;border-bottom:1px solid var(--border,#E2E8F0);">';
                 html += '<input type="checkbox" data-inv="' + idx + '" data-detail="' + dIdx + '" class="inv-line-cb" style="margin-top:3px;">';
                 html += '<div style="flex:1;min-width:0;">';
                 html += '<div style="font-size:0.82rem;font-weight:500;">' + escapeHtml(desc) + '</div>';

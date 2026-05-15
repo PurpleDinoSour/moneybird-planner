@@ -180,7 +180,7 @@ async function addCustomerUI() {
     try {
         await addCustomer(name, color);
         nameInput.value = '';
-        colorInput.value = '#3b82f6';
+        colorInput.value = '#1D4ED8';
         await initializeCustomerUI();
     } catch (err) {
         alert(`Error adding customer: ${err.message}`);
