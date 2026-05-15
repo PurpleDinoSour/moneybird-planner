@@ -23,7 +23,46 @@
 
                                        },
                      "hourlyRate":  112
+                 },
+                 {
+                     "id":  "job_1778866964287",
+                     "name":  "DNB",
+                     "color":  "#f59e0b",
+                     "projectId":  "483870075814676273",
+                     "projectName":  "DNB",
+                     "description":  "Consultancy uren",
+                     "hourlyRate":  107.5,
+                     "schedule":  {
+                                      "1":  {
+                                                "start":  "07:00",
+                                                "end":  "16:00",
+                                                "lunch":  true
+                                            },
+                                      "2":  {
+                                                "start":  "07:00",
+                                                "end":  "12:00",
+                                                "lunch":  true
+                                            },
+                                      "3":  {
+                                                "start":  "07:00",
+                                                "end":  "16:00",
+                                                "lunch":  true
+                                            },
+                                      "4":  {
+                                                "start":  "07:00",
+                                                "end":  "16:00",
+                                                "lunch":  true
+                                            },
+                                      "5":  {
+                                                "start":  "07:00",
+                                                "end":  "16:00",
+                                                "lunch":  true
+                                            }
+                                  },
+                     "dateOverrides":  {
+
+                                       }
                  }
              ],
-    "lastModified":  "2026-05-15T17:42:42.387Z"
+    "lastModified":  "2026-05-15T17:43:59.776Z"
 }
