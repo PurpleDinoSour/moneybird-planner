@@ -2592,3 +2592,9 @@ body.wbso-mode .tab.active { background: var(--wbso); border-color: var(--wbso);
     font-weight: 600;
     margin-left: 4px;
 }
+.invoice-total-preview {
+    color: var(--accent);
+    font-weight: 600;
+    margin-left: 6px;
+    font-size: 0.9em;
+}

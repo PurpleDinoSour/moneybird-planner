@@ -1043,7 +1043,7 @@ function renderConceptInvoicesList() {
         html += '</div>';
         html += '</div>';
         html += '<div class="invoice-card-right">';
-        html += '<span class="invoice-total">EUR ' + escapeHtml(totalPrice) + '</span>';
+        html += '<span class="invoice-total">EUR ' + escapeHtml(totalPrice) + '<span class="invoice-total-preview" id="invoiceTotalPreview' + idx + '"></span></span>';
         html += '<span class="invoice-chevron" id="invoiceChevron' + idx + '">&#9660;</span>';
         html += '</div>';
         html += '</button>';
@@ -1253,6 +1253,13 @@ function annotateInvoiceLinesWithPreview(idx) {
         }
         if (linksCell) linksCell.innerHTML = entryCount + ' <span class="invoice-line-preview">(preview)</span>';
     });
+    // Update header total preview if any unbilled line was annotated.
+    var anyUnbilled = (inv.details || []).some(function(d) { return !d.time_entry_ids || d.time_entry_ids.length === 0; });
+    var totalEl = document.getElementById('invoiceTotalPreview' + idx);
+    if (totalEl && anyUnbilled && bestRate > 0 && totalHours > 0) {
+        var projected = (totalHours * bestRate).toFixed(2);
+        totalEl.innerHTML = ' &rarr; EUR ' + projected;
+    }
 }
 
 // Attach all time entries currently linked to the invoice to a specific detail line
