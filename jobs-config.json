@@ -5,20 +5,10 @@
                      "name":  "Main",
                      "color":  "#10b981",
                      "projectId":  "478308704970605831",
-                     "projectName":  "",
+                     "projectName":  "Rijksinstituut voor Volksgezondheid en Milieu (RIVM)",
                      "description":  "Consultancy uren",
                      "schedule":  {
-                                      "1":  {
-                                                "start":  "07:00",
-                                                "end":  "17:00",
-                                                "lunch":  true
-                                            },
                                       "2":  {
-                                                "start":  "07:00",
-                                                "end":  "17:00",
-                                                "lunch":  true
-                                            },
-                                      "4":  {
                                                 "start":  "07:00",
                                                 "end":  "17:00",
                                                 "lunch":  true
@@ -31,8 +21,9 @@
                                   },
                      "dateOverrides":  {
 
-                                       }
+                                       },
+                     "hourlyRate":  112
                  }
              ],
-    "lastModified":  "2026-05-15T17:42:16.010Z"
+    "lastModified":  "2026-05-15T17:42:42.387Z"
 }
