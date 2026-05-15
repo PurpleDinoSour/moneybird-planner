@@ -168,18 +168,52 @@ function renderCalendar(forceRecompute) {
         let cardHTML = `<span class="day-number">${d}</span><span class="day-name">${DAY_NAMES[dayOfWeek]}</span>`;
 
         // Job color bars + holiday bar at bottom (show hours per customer)
-        var hasBars = (jobsOnDay.length > 0 && appState.currentHourType !== 'wbso') || isHoliday;
+        // Schedule grid is now integrated INTO each day-card:
+        //   - Active jobs render as colored, clickable bars (toggle off, right-click edit)
+        //   - On weekdays (Mon-Fri), inactive jobs render as ghost bars (click to add)
+        //   - Bars stop event propagation so day-card selection still works on empty area
+        var isWeekday = dayOfWeek >= 1 && dayOfWeek <= 5;
+        var inFacturable = appState.currentHourType !== 'wbso';
+        var hasActive = jobsOnDay.length > 0 && inFacturable;
+        var hasGhosts = inFacturable && isWeekday && appState.jobs.length > 0;
+        var hasBars = hasActive || hasGhosts || isHoliday;
+
         if (hasBars) {
             cardHTML += '<div class="job-bars">';
-            if (jobsOnDay.length > 0 && appState.currentHourType !== 'wbso') {
-                jobsOnDay.forEach(function(job) {
+
+            if (hasActive) {
+                jobsOnDay.forEach(function (job) {
                     var sched = getScheduleForJobDate(job, dateStr);
                     var hrs = calculateJobHours(sched);
                     var label = escapeHtml(job.name) + ' ' + hrs;
                     var barColor = getExecutiveCustomerColor(job.color, 'bar');
-                    cardHTML += '<div class="job-bar" style="background:' + barColor + ';" title="' + escapeHtml(job.name) + ' ' + hrs + 'h">' + label + '</div>';
+                    var hasOverride = (job.dateOverrides || {}).hasOwnProperty(dateStr);
+                    var overrideMark = hasOverride ? ' *' : '';
+                    cardHTML += '<div class="job-bar job-bar-active" '
+                        + 'data-job="' + job.id + '" data-date="' + dateStr + '" '
+                        + 'onclick="event.stopPropagation(); toggleScheduleCell(this);" '
+                        + 'oncontextmenu="event.preventDefault(); event.stopPropagation(); openHourEditor(this);" '
+                        + 'style="background:' + barColor + ';" '
+                        + 'title="' + escapeHtml(job.name) + ' ' + hrs + 'h - click to remove, right-click to edit hours">'
+                        + label + overrideMark + '</div>';
                 });
             }
+
+            // Ghost bars for inactive jobs on weekdays - lets user add a job to the day
+            // without leaving the calendar view.
+            if (hasGhosts) {
+                appState.jobs.forEach(function (job) {
+                    if (isJobActiveOnDate(job, dateStr)) return;
+                    var dotColor = getExecutiveCustomerColor(job.color, 'dot');
+                    cardHTML += '<div class="job-bar job-bar-ghost" '
+                        + 'data-job="' + job.id + '" data-date="' + dateStr + '" '
+                        + 'onclick="event.stopPropagation(); toggleScheduleCell(this);" '
+                        + 'style="--ghost-color:' + dotColor + ';" '
+                        + 'title="' + escapeHtml(job.name) + ' - click to add to this day">+ '
+                        + escapeHtml(job.name) + '</div>';
+                });
+            }
+
             if (isHoliday) {
                 cardHTML += '<div class="job-bar job-bar-holiday" title="' + escapeHtml(holidayName) + '">' + escapeHtml(holidayName) + '</div>';
             }

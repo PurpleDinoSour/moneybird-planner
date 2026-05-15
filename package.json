@@ -1,9 +1,9 @@
 {
-  "name": "moneybird-planner",
-  "version": "1.0.0",
-  "private": true,
-  "description": "Moneybird Planner IV - vanilla JS planner + registration tool",
-  "scripts": {
-    "test": "node --test tests/*.test.js"
-  }
+    "name": "moneybird-planner",
+    "version": "1.0.0",
+    "private": true,
+    "description": "Moneybird Planner IV - vanilla JS planner + registration tool",
+    "scripts": {
+        "test": "node --test tests/*.test.js"
+    }
 }

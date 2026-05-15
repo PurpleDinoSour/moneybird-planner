@@ -95,12 +95,14 @@
             '        <li><kbd>o</kbd><span>Toggle customer overview</span></li>',
             '        <li><kbd>i</kbd><span>Open invoices</span></li>',
             '        <li><kbd>u</kbd><span>Open hours management</span></li>',
+            '        <li><kbd>g</kbd><span>Auto-pick from git activity</span></li>',
             '      </ul>',
             '    </div>',
             '    <div class="kbd-group">',
             '      <h4>General</h4>',
             '      <ul>',
             '        <li><kbd>?</kbd><span>Show this help</span></li>',
+            '        <li><kbd>,</kbd><span>Open preferences</span></li>',
             '        <li><kbd>Esc</kbd><span>Close overlay / modal</span></li>',
             '      </ul>',
             '    </div>',
@@ -254,6 +256,16 @@
         }
         if (key === 'u') {
             if (typeof fetchExistingHours === 'function') fetchExistingHours();
+            ev.preventDefault();
+            return;
+        }
+        if (key === 'g') {
+            if (window.gitAutoPick) window.gitAutoPick.run();
+            ev.preventDefault();
+            return;
+        }
+        if (key === ',') {
+            if (window.settingsModal) window.settingsModal.open();
             ev.preventDefault();
             return;
         }

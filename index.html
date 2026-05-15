@@ -148,9 +148,6 @@
                 </div>
                 <div class="calendar-grid" id="calendarGrid"></div>
 
-                <!-- Schedule Grid (Facturable only, integrated between calendar and week overview) -->
-                <div id="scheduleGrid" class="calendar-schedule-embed" style="display:none;"></div>
-
                 <div id="monthSummary"></div>
             </div>
 
@@ -212,9 +209,11 @@
                     </div>
                     <div class="action-bar-divider" aria-hidden="true"></div>
                     <div class="action-bar-group action-bar-group-primary">
+                        <button class="btn btn-ghost" onclick="if(window.gitAutoPick)window.gitAutoPick.run()" title="Auto-pick days from git activity">Git auto-pick</button>
                         <button class="btn btn-ghost" onclick="clearAll()">Clear</button>
                         <button class="btn btn-secondary" onclick="previewSelection()">Preview</button>
                         <button class="btn btn-primary" onclick="startRegistration()">Register</button>
+                        <button class="btn btn-ghost btn-icon" title="Preferences" onclick="if(window.settingsModal)window.settingsModal.open()" aria-label="Preferences">&#9881;</button>
                         <button class="btn btn-ghost btn-help" title="Keyboard shortcuts (?)" onclick="if(window.keyboardNav)window.keyboardNav.showHelp()" aria-label="Keyboard shortcuts">?</button>
                     </div>
                 </div>
@@ -510,6 +509,8 @@
 <script src="js/auto-diff.js"></script>
 <script src="js/wbso-overlay.js"></script>
 <script src="js/keyboard.js"></script>
+<script src="js/settings.js"></script>
+<script src="js/git-autopick.js"></script>
 <script src="js/app.js"></script>
 
 </body>

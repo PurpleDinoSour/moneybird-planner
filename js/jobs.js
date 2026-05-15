@@ -253,6 +253,14 @@ function buildMonthWeeks(year, month) {
 }
 
 function renderScheduleGrid() {
+    // Schedule grid is integrated into the main calendar (each day-card now
+    // renders interactive job-bars). This stub remains so existing call-sites
+    // do not break, but it is a no-op. The container is hidden in the DOM.
+    var container = document.getElementById('scheduleGrid');
+    if (container) container.style.display = 'none';
+}
+
+function renderScheduleGridLegacy_unused() {
     var container = document.getElementById('scheduleGrid');
     if (!container) return;
     if (appState.jobs.length === 0 || appState.currentHourType === 'wbso') {
