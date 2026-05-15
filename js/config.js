@@ -52,6 +52,11 @@ const appState = {
     missingDates: [],
     conceptInvoices: []
 };
+// `const` at script top-level is NOT auto-attached to window. Modules that
+// use `window.appState` as a guard would silently see undefined and fall
+// into wrong branches (planning.js -> no jobs path, diff.js -> "no jobs
+// configured" warning), even though the calendar renders jobs fine.
+window.appState = appState;
 
 // --- WBSO DASHBOARD STATE ---
 const wbsoDashboardState = {
