@@ -116,9 +116,10 @@
         el.innerHTML = [
             '<div class="diff-modal-card">',
             '  <div class="diff-modal-header">',
-            '    <h3>Registration preview</h3>',
+            '    <h3>Registration preview <span id="diffModeBadge" class="diff-mode-badge"></span></h3>',
             '    <button class="diff-modal-close" aria-label="Close">Esc</button>',
             '  </div>',
+            '  <div class="diff-modal-warning" id="diffModalWarning" style="display:none;"></div>',
             '  <div class="diff-modal-summary" id="diffModalSummary"></div>',
             '  <div class="diff-modal-body" id="diffModalBody"></div>',
             '  <div class="diff-modal-actions">',
@@ -206,6 +207,29 @@
     //   or null if cancelled.
     function show(diff) {
         const el = ensureModal();
+        // Mode badge + sanity warning
+        const mode = (window.appState && appState.currentHourType) || 'facturable';
+        const badge = document.getElementById('diffModeBadge');
+        if (badge) {
+            badge.textContent = mode.toUpperCase();
+            badge.dataset.mode = mode;
+        }
+        const warn = document.getElementById('diffModalWarning');
+        const hasJobs = window.appState && Array.isArray(appState.jobs) && appState.jobs.length > 0;
+        const noJobNames = diff.entries.every(function (r) { return !r.jobName; });
+        if (warn) {
+            if (mode === 'wbso' && hasJobs && noJobNames) {
+                warn.innerHTML = '<strong>Heads-up:</strong> you are in <em>WBSO</em> mode but have ' + appState.jobs.length
+                    + ' Facturable job(s) configured. WBSO entries are not split per job. Switch to <em>Facturable</em> at the top (or press <kbd>t</kbd>) if you wanted DNB / RIVM project assignments.';
+                warn.style.display = '';
+            } else if (mode === 'facturable' && !hasJobs) {
+                warn.innerHTML = '<strong>Heads-up:</strong> Facturable mode but no jobs configured. Entries will use the single project from Settings.';
+                warn.style.display = '';
+            } else {
+                warn.style.display = 'none';
+                warn.innerHTML = '';
+            }
+        }
         document.getElementById('diffModalSummary').innerHTML = renderSummary(diff.summary);
         document.getElementById('diffModalBody').innerHTML = renderRows(diff.entries);
         const confirmBtn = document.getElementById('diffModalConfirm');

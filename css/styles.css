@@ -2382,3 +2382,46 @@ body.wbso-mode .tab.active { background: var(--wbso); border-color: var(--wbso);
     border-top: 1px solid var(--border);
     background: var(--surface);
 }
+
+/* ===== Diff modal: mode badge + sanity warning =========================== */
+.diff-mode-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 0.6rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    border: 1px solid var(--border);
+    margin-left: 8px;
+    vertical-align: middle;
+    color: var(--muted);
+    background: var(--surface);
+}
+.diff-mode-badge[data-mode="facturable"] {
+    color: #061a0d;
+    background: var(--accent);
+    border-color: var(--accent);
+}
+.diff-mode-badge[data-mode="wbso"] {
+    color: #052235;
+    background: var(--wbso, #38bdf8);
+    border-color: var(--wbso, #38bdf8);
+}
+.diff-modal-warning {
+    margin: 0 20px 12px;
+    padding: 10px 14px;
+    border: 1px solid rgba(251, 191, 36, 0.35);
+    background: rgba(251, 191, 36, 0.08);
+    color: #fde68a;
+    border-radius: 8px;
+    font-size: 0.82rem;
+    line-height: 1.45;
+}
+.diff-modal-warning kbd {
+    background: rgba(0, 0, 0, 0.45);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    padding: 1px 5px;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+}
