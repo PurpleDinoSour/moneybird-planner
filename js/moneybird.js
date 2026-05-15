@@ -1104,6 +1104,21 @@ function toggleInvoiceDetails(idx) {
     }
 }
 
+// Persistent map: invoice contactId -> [projectId, ...] so the picker remembers
+// which projects (e.g. DNB project) belong to which broker invoice (e.g. Wortell).
+function getInvoiceProjectMap() {
+    try { return JSON.parse(localStorage.getItem('mb3_invoice_project_map') || '{}'); }
+    catch (e) { return {}; }
+}
+function rememberInvoiceProjects(contactId, projectIds) {
+    if (!contactId || !projectIds || projectIds.length === 0) return;
+    var map = getInvoiceProjectMap();
+    var existing = map[contactId] || [];
+    projectIds.forEach(function(pid) { if (pid && existing.indexOf(pid) === -1) existing.push(pid); });
+    map[contactId] = existing;
+    try { localStorage.setItem('mb3_invoice_project_map', JSON.stringify(map)); } catch (e) {}
+}
+
 async function linkHoursToInvoice(invIdx) {
     var config = getCurrentConfig();
     var invoice = appState.conceptInvoices[invIdx];
@@ -1128,40 +1143,67 @@ async function linkHoursToInvoice(invIdx) {
             page++;
         }
 
-        // Filter to entries matching the invoice's contact
-        var matchingEntries = contactId ? allEntries.filter(function(e) { return e.contact_id === contactId; }) : allEntries;
-        var otherEntries = contactId ? allEntries.filter(function(e) { return e.contact_id !== contactId; }) : [];
-
         if (allEntries.length === 0) {
             alert('No open (non-invoiced) time entries found.');
             return;
         }
 
-        // Build picker items
-        var items = [];
-        matchingEntries.forEach(function(e) {
+        // Resolve each entry to a project (job pill) and figure out what should be auto-checked.
+        var jobs = (window.appState && Array.isArray(appState.jobs)) ? appState.jobs : [];
+        var projectMap = getInvoiceProjectMap();
+        var rememberedProjects = projectMap[contactId] || [];
+        var directContactMatch = allEntries.some(function(e) { return e.contact_id === contactId; });
+
+        var items = allEntries.map(function(e) {
             var date = e.started_at ? e.started_at.substring(0, 10) : '';
             var hours = 0;
             if (e.started_at && e.ended_at) {
                 hours = (new Date(e.ended_at) - new Date(e.started_at)) / 3600000;
                 if (e.paused_duration) hours -= e.paused_duration / 3600;
             }
-            items.push({ id: e.id, date: date, hours: hours, desc: e.description || '', contact: contactName, match: true });
+            var pid = e.project_id || (e.project && e.project.id) || null;
+            var pidStr = pid != null ? String(pid) : '';
+            var matchJob = jobs.find(function(j) { return String(j.projectId || '') === pidStr; });
+            var projectName = matchJob ? matchJob.name : ((e.project && e.project.name) || (pidStr ? 'Project ' + pidStr : 'No project'));
+            var projectColor = matchJob ? matchJob.color : null;
+            // Auto-check if: a) entry contact matches invoice contact directly, OR
+            //               b) entry project was previously linked to this contact.
+            var match = (e.contact_id && e.contact_id === contactId)
+                     || (pidStr && rememberedProjects.indexOf(pidStr) !== -1);
+            return {
+                id: e.id,
+                date: date,
+                hours: hours,
+                desc: e.description || '',
+                projectId: pidStr,
+                projectName: projectName,
+                projectColor: projectColor,
+                match: match
+            };
         });
-        otherEntries.forEach(function(e) {
-            var date = e.started_at ? e.started_at.substring(0, 10) : '';
-            var hours = 0;
-            if (e.started_at && e.ended_at) {
-                hours = (new Date(e.ended_at) - new Date(e.started_at)) / 3600000;
-                if (e.paused_duration) hours -= e.paused_duration / 3600;
-            }
-            var cName = (e.contact && e.contact.company_name) ? e.contact.company_name : 'Unknown';
-            items.push({ id: e.id, date: date, hours: hours, desc: e.description || '', contact: cName, match: false });
+
+        // Sort: matches first, then by date descending (newest first), then by project name.
+        items.sort(function(a, b) {
+            if (a.match !== b.match) return a.match ? -1 : 1;
+            if (a.date !== b.date) return a.date < b.date ? 1 : -1;
+            return a.projectName.localeCompare(b.projectName);
         });
 
         // Show picker modal
-        var selected = await showTimeEntryPicker('Add hours to ' + contactName, items);
+        var pickerTitle = 'Add hours to ' + contactName;
+        if (!directContactMatch && rememberedProjects.length === 0) {
+            pickerTitle += ' (no auto-match - filter by project below)';
+        }
+        var selected = await showTimeEntryPicker(pickerTitle, items);
         if (!selected || selected.length === 0) return;
+
+        // Remember which projects the user picked for this invoice contact.
+        var pickedProjectIds = [];
+        selected.forEach(function(id) {
+            var item = items.find(function(it) { return it.id === id; });
+            if (item && item.projectId) pickedProjectIds.push(item.projectId);
+        });
+        rememberInvoiceProjects(contactId, pickedProjectIds);
 
         // Link each selected time entry to this invoice
         var success = 0;
@@ -1228,17 +1270,69 @@ function showTimeEntryPicker(title, items) {
         var list = document.createElement('div');
         list.className = 'te-picker-list';
 
+        // Build a set of unique projects present in the items (for filter chips).
+        var projectsInItems = {};
+        items.forEach(function(it) {
+            var key = it.projectId || '_none';
+            if (!projectsInItems[key]) {
+                projectsInItems[key] = { id: key, name: it.projectName, color: it.projectColor, count: 0, hours: 0 };
+            }
+            projectsInItems[key].count++;
+            projectsInItems[key].hours += it.hours;
+        });
+
+        if (items.length > 0) {
+            var filterRow = document.createElement('div');
+            filterRow.className = 'te-picker-filterbar';
+            var allChip = document.createElement('button');
+            allChip.type = 'button';
+            allChip.className = 'te-picker-chip te-picker-chip-active';
+            allChip.dataset.filter = '_all';
+            allChip.textContent = 'All (' + items.length + ')';
+            filterRow.appendChild(allChip);
+            Object.keys(projectsInItems).forEach(function(key) {
+                var p = projectsInItems[key];
+                var chip = document.createElement('button');
+                chip.type = 'button';
+                chip.className = 'te-picker-chip';
+                chip.dataset.filter = key;
+                chip.textContent = p.name + ' (' + p.count + ' / ' + p.hours.toFixed(1) + 'h)';
+                if (p.color) {
+                    chip.style.borderColor = p.color;
+                    chip.style.setProperty('--chip-accent', p.color);
+                }
+                filterRow.appendChild(chip);
+            });
+            modal.appendChild(filterRow);
+            filterRow.addEventListener('click', function(ev) {
+                var btn = ev.target.closest('.te-picker-chip');
+                if (!btn) return;
+                filterRow.querySelectorAll('.te-picker-chip').forEach(function(c) { c.classList.remove('te-picker-chip-active'); });
+                btn.classList.add('te-picker-chip-active');
+                var filter = btn.dataset.filter;
+                modal.querySelectorAll('.te-picker-row').forEach(function(tr) {
+                    if (filter === '_all') tr.style.display = '';
+                    else tr.style.display = (tr.dataset.project === filter) ? '' : 'none';
+                });
+            });
+        }
+
         if (items.length === 0) {
             list.innerHTML = '<p class="te-picker-empty">No open time entries found</p>';
         } else {
             var html = '<table class="te-picker-table">';
-            html += '<thead><tr><th></th><th>Date</th><th>Hours</th><th>Contact</th><th>Description</th></tr></thead><tbody>';
+            html += '<thead><tr><th></th><th>Date</th><th>Hours</th><th>Project</th><th>Description</th></tr></thead><tbody>';
             items.forEach(function(item) {
-                html += '<tr class="' + (item.match ? '' : 'te-picker-mismatch') + '">';
+                var rowCls = 'te-picker-row' + (item.match ? '' : ' te-picker-mismatch');
+                html += '<tr class="' + rowCls + '" data-project="' + escapeHtml(item.projectId || '_none') + '">';
                 html += '<td><input type="checkbox" class="te-pick-cb" data-id="' + item.id + '"' + (item.match ? ' checked' : '') + '></td>';
                 html += '<td class="te-picker-date">' + escapeHtml(item.date) + '</td>';
                 html += '<td class="te-picker-hours">' + item.hours.toFixed(1) + 'h</td>';
-                html += '<td class="te-picker-contact">' + escapeHtml(item.contact) + '</td>';
+                if (item.projectColor) {
+                    html += '<td class="te-picker-project"><span class="hour-entry-pill" style="background:' + escapeHtml(item.projectColor) + ';">' + escapeHtml(item.projectName) + '</span></td>';
+                } else {
+                    html += '<td class="te-picker-project"><span class="hour-entry-pill hour-entry-pill-unknown">' + escapeHtml(item.projectName) + '</span></td>';
+                }
                 html += '<td class="te-picker-desc">' + escapeHtml(item.desc || '-') + '</td>';
                 html += '</tr>';
             });
@@ -1246,6 +1340,24 @@ function showTimeEntryPicker(title, items) {
             list.innerHTML = html;
         }
         modal.appendChild(list);
+
+        // Select All / Deselect All respect the current filter (only visible rows).
+        selAllBtn.onclick = function() {
+            modal.querySelectorAll('.te-picker-row').forEach(function(tr) {
+                if (tr.style.display !== 'none') {
+                    var cb = tr.querySelector('.te-pick-cb');
+                    if (cb) cb.checked = true;
+                }
+            });
+        };
+        desAllBtn.onclick = function() {
+            modal.querySelectorAll('.te-picker-row').forEach(function(tr) {
+                if (tr.style.display !== 'none') {
+                    var cb = tr.querySelector('.te-pick-cb');
+                    if (cb) cb.checked = false;
+                }
+            });
+        };
 
         var btnRow = document.createElement('div');
         btnRow.className = 'te-picker-actions';
