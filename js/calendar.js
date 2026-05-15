@@ -101,7 +101,8 @@ function renderCalendar(forceRecompute) {
             if (appState.jobs.length > 1) {
                 appState.jobs.forEach(function(job) {
                     if (weekJobHours[job.id] > 0) {
-                        html += '<span class="wt-job" style="background:' + job.color + ';">' + escapeHtml(job.name) + ' ' + weekJobHours[job.id] + '</span>';
+                        var weekChipColor = getExecutiveCustomerColor(job.color, 'chip');
+                        html += '<span class="wt-job" style="background:' + weekChipColor + ';">' + escapeHtml(job.name) + ' ' + weekJobHours[job.id] + '</span>';
                     }
                 });
             }
@@ -160,7 +161,8 @@ function renderCalendar(forceRecompute) {
                     var sched = getScheduleForJobDate(job, dateStr);
                     var hrs = calculateJobHours(sched);
                     var label = escapeHtml(job.name) + ' ' + hrs;
-                    cardHTML += '<div class="job-bar" style="background:' + job.color + ';" title="' + escapeHtml(job.name) + ' ' + hrs + 'h">' + label + '</div>';
+                    var barColor = getExecutiveCustomerColor(job.color, 'bar');
+                    cardHTML += '<div class="job-bar" style="background:' + barColor + ';" title="' + escapeHtml(job.name) + ' ' + hrs + 'h">' + label + '</div>';
                 });
             }
             if (isHoliday) {
@@ -211,8 +213,8 @@ function renderCalendar(forceRecompute) {
 
     updateCounter();
     renderMonthSummary(year, month);
-    // Refresh overview if visible
-    if (document.getElementById('customerOverviewPanel') && document.getElementById('customerOverviewPanel').style.display !== 'none') {
+    // Keep overview summary synchronized with month and schedules.
+    if (document.getElementById('customerOverviewPanel')) {
         renderCustomerOverview();
     }
 }
@@ -265,7 +267,8 @@ function renderMonthSummary(year, month) {
     var html = '<table class="month-summary-table"><thead><tr>';
     html += '<th>Week</th>';
     appState.jobs.forEach(function(job) {
-        html += '<th><span class="ms-job-dot" style="background:' + job.color + ';"></span>' + escapeHtml(job.name) + '</th>';
+        var monthDotColor = getExecutiveCustomerColor(job.color, 'dot');
+        html += '<th><span class="ms-job-dot" style="background:' + monthDotColor + ';"></span>' + escapeHtml(job.name) + '</th>';
     });
     if (appState.jobs.length > 1) html += '<th>Total</th>';
     html += '</tr></thead><tbody>';

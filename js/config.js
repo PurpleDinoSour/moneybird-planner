@@ -36,7 +36,7 @@ const DEFAULT_PROJECTS = [
     'M365DSC_CICD_NPRD'
 ];
 
-const JOB_COLORS = ['#1D4ED8', '#047857', '#B45309', '#6D28D9', '#BE123C', '#0F766E'];
+const JOB_COLORS = ['#3B82F6', '#14B8A6', '#D97706', '#8B5CF6', '#E11D48', '#06B6D4'];
 
 // --- APPLICATION STATE ---
 const appState = {

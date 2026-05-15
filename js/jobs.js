@@ -323,6 +323,7 @@ function renderScheduleGrid() {
                 var hrs = sched ? calculateJobHours(sched) : 0;
                 var isHourOverride = hasOverride && typeof (job.dateOverrides || {})[dateStr] === 'object';
                 var chipCls = 'sg-chip';
+                var chipColor = getExecutiveCustomerColor(job.color, 'chip');
                 if (active) chipCls += ' sg-chip-on';
                 if (hasOverride) chipCls += ' sg-chip-override';
 
@@ -330,7 +331,7 @@ function renderScheduleGrid() {
                 html += 'data-job="' + job.id + '" data-date="' + dateStr + '" ';
                 html += 'onclick="toggleScheduleCell(this)" ';
                 html += 'oncontextmenu="event.preventDefault(); openHourEditor(this);" ';
-                html += 'style="' + (active ? 'background:' + job.color + '; color:#fff; border-color:' + job.color + ';' : '') + '" ';
+                html += 'style="' + (active ? 'background:' + chipColor + '; color:#fff; border-color:' + chipColor + ';' : '') + '" ';
                 html += 'title="' + escapeHtml(job.name) + (hrs > 0 ? ' ' + hrs + 'h' : '') + (isHourOverride ? ' (custom hours)' : hasOverride ? ' (manual override)' : '') + ' — right-click to edit hours">';
                 html += escapeHtml(job.name);
                 if (active && hrs > 0) html += ' ' + hrs + 'h';
@@ -348,7 +349,8 @@ function renderScheduleGrid() {
     // Legend
     html += '<div class="sg-legend">';
     appState.jobs.forEach(function(job) {
-        html += '<span class="sg-legend-item"><span class="sg-legend-dot" style="background:' + job.color + ';"></span>' + escapeHtml(job.name) + '</span>';
+        var legendColor = getExecutiveCustomerColor(job.color, 'dot');
+        html += '<span class="sg-legend-item"><span class="sg-legend-dot" style="background:' + legendColor + ';"></span>' + escapeHtml(job.name) + '</span>';
     });
     html += '<span class="sg-legend-item"><span class="sg-legend-dot" style="background:#f59e0b;"></span>Holiday</span>';
     html += '<span class="sg-legend-item sg-legend-muted">* = manual override</span>';
@@ -531,15 +533,17 @@ function renderJobsList() {
         var dayNames = Object.keys(job.schedule).sort().map(function(d) {
             return DAY_NAMES[parseInt(d)];
         });
+        var cardAccentColor = getExecutiveCustomerColor(job.color, 'chip');
+        var cardDotColor = getExecutiveCustomerColor(job.color, 'dot');
         var totalWeeklyHours = 0;
         Object.keys(job.schedule).forEach(function(d) {
             totalWeeklyHours += calculateJobHours(job.schedule[d]);
         });
 
-        return '<div class="job-card" style="border-left:3px solid ' + job.color + ';">' +
+        return '<div class="job-card" style="border-left:3px solid ' + cardAccentColor + ';">' +
             '<div class="job-card-header">' +
                 '<div class="job-card-info">' +
-                    '<span class="job-dot" style="background:' + job.color + ';"></span>' +
+                    '<span class="job-dot" style="background:' + cardDotColor + ';"></span>' +
                     '<strong>' + escapeHtml(job.name) + '</strong>' +
                 '</div>' +
                 '<div class="job-card-actions">' +

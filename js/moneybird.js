@@ -941,7 +941,7 @@ async function fetchConceptInvoices() {
     var section = document.getElementById('conceptInvoicesSection');
     section.style.display = 'block';
     var list = document.getElementById('conceptInvoicesList');
-    list.innerHTML = '<p style="padding:20px; text-align:center;">Loading concept invoices...</p>';
+    list.innerHTML = '<p class="invoice-loading">Loading concept invoices...</p>';
 
     try {
         var allInvoices = [];
@@ -959,7 +959,7 @@ async function fetchConceptInvoices() {
         }
 
         // List endpoint omits time_entry_ids — fetch each invoice individually for full details
-        list.innerHTML = '<p style="padding:20px; text-align:center;">Loading details for ' + allInvoices.length + ' invoice(s)...</p>';
+        list.innerHTML = '<p class="invoice-loading">Loading details for ' + allInvoices.length + ' invoice(s)...</p>';
         var fullInvoices = [];
         for (var i = 0; i < allInvoices.length; i++) {
             try {
@@ -979,7 +979,7 @@ async function fetchConceptInvoices() {
         appState.conceptInvoices = fullInvoices;
         renderConceptInvoicesList();
     } catch (err) {
-        list.innerHTML = '<p style="padding:20px; text-align:center; color:var(--danger);">Error: ' + escapeHtml(err.message) + '</p>';
+        list.innerHTML = '<p class="invoice-error">Error: ' + escapeHtml(err.message) + '</p>';
     }
 }
 
@@ -990,11 +990,11 @@ function renderConceptInvoicesList() {
     document.getElementById('conceptInvoiceCount').textContent = invoices.length + ' concept invoice' + (invoices.length !== 1 ? 's' : '');
 
     if (invoices.length === 0) {
-        list.innerHTML = '<p style="padding:20px; text-align:center; color:var(--success,#22c55e);">No concept invoices found</p>';
+        list.innerHTML = '<p class="invoice-empty">No concept invoices found</p>';
         return;
     }
 
-    var html = '';
+    var html = '<div class="concept-invoice-list">';
     invoices.forEach(function(inv, idx) {
         var contactName = (inv.contact && inv.contact.company_name) ? inv.contact.company_name : (inv.contact ? inv.contact.firstname + ' ' + inv.contact.lastname : 'Unknown');
         var totalPrice = inv.total_price_incl_tax_base ? parseFloat(inv.total_price_incl_tax_base).toFixed(2) : '0.00';
@@ -1010,24 +1010,24 @@ function renderConceptInvoicesList() {
         var invoiceDate = inv.invoice_date || inv.created_at || '';
         if (invoiceDate && invoiceDate.length > 10) invoiceDate = invoiceDate.substring(0, 10);
 
-        html += '<div style="border:1px solid var(--border,#E2E8F0);border-radius:8px;margin-bottom:8px;overflow:hidden;">';
-        html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--bg-elevated,#F8FAFC);cursor:pointer;" onclick="toggleInvoiceDetails(' + idx + ')">';
-        html += '<div>';
-        html += '<div style="font-weight:600;font-size:0.9rem;">' + escapeHtml(contactName) + '</div>';
-        html += '<div style="font-size:0.78rem;color:var(--muted);">';
+        html += '<article class="invoice-card">';
+        html += '<button type="button" class="invoice-card-header" onclick="toggleInvoiceDetails(' + idx + ')">';
+        html += '<div class="invoice-card-main">';
+        html += '<div class="invoice-customer">' + escapeHtml(contactName) + '</div>';
+        html += '<div class="invoice-meta">';
         html += (inv.invoice_id ? '#' + inv.invoice_id : 'Draft') + ' &middot; ' + invoiceDate + ' &middot; ' + detailCount + ' line(s)';
         if (timeEntryCount > 0) html += ' &middot; ' + timeEntryCount + ' time entries';
         html += '</div>';
         html += '</div>';
-        html += '<div style="display:flex;align-items:center;gap:8px;">';
-        html += '<span style="font-weight:700;font-size:0.9rem;">&euro;' + escapeHtml(totalPrice) + '</span>';
-        html += '<span style="font-size:1.2rem;color:var(--muted);transition:transform 0.2s;" id="invoiceChevron' + idx + '">&#9660;</span>';
+        html += '<div class="invoice-card-right">';
+        html += '<span class="invoice-total">EUR ' + escapeHtml(totalPrice) + '</span>';
+        html += '<span class="invoice-chevron" id="invoiceChevron' + idx + '">&#9660;</span>';
         html += '</div>';
-        html += '</div>';
+        html += '</button>';
 
         // Detail lines (collapsed by default)
-        html += '<div id="invoiceDetails' + idx + '" style="display:none;padding:0 14px 10px;">';
-        html += '<div style="margin:8px 0 6px;display:flex;gap:8px;flex-wrap:wrap;">';
+        html += '<div id="invoiceDetails' + idx + '" class="invoice-details" hidden>';
+        html += '<div class="invoice-actions">';
         html += '<button class="btn btn-sm btn-secondary" onclick="linkHoursToInvoice(' + idx + ')">+ Add Hours</button>';
         if (inv.details && inv.details.length > 0) {
             html += '<button class="btn btn-sm btn-ghost" onclick="selectAllInvoiceLines(' + idx + ')">Select All</button>';
@@ -1037,7 +1037,9 @@ function renderConceptInvoicesList() {
         html += '<button class="btn btn-sm btn-danger" onclick="deleteConceptInvoice(' + idx + ')">Delete Invoice</button>';
         html += '</div>';
         if (inv.details && inv.details.length > 0) {
-
+            html += '<div class="invoice-lines-wrap">';
+            html += '<table class="invoice-lines-table">';
+            html += '<thead><tr><th></th><th>Description</th><th>Qty</th><th>Rate</th><th>Period</th><th>Links</th></tr></thead><tbody>';
             inv.details.forEach(function(detail, dIdx) {
                 var desc = detail.description || 'No description';
                 var qty = detail.amount || '';
@@ -1046,24 +1048,23 @@ function renderConceptInvoicesList() {
                 var hasTimeEntries = detail.time_entry_ids && detail.time_entry_ids.length > 0;
                 var teCount = hasTimeEntries ? detail.time_entry_ids.length : 0;
 
-                html += '<div style="display:flex;align-items:flex-start;gap:8px;padding:6px 0;border-bottom:1px solid var(--border,#E2E8F0);">';
-                html += '<input type="checkbox" data-inv="' + idx + '" data-detail="' + dIdx + '" class="inv-line-cb" style="margin-top:3px;">';
-                html += '<div style="flex:1;min-width:0;">';
-                html += '<div style="font-size:0.82rem;font-weight:500;">' + escapeHtml(desc) + '</div>';
-                html += '<div style="font-size:0.75rem;color:var(--muted);">';
-                html += qty + ' x &euro;' + escapeHtml(price);
-                if (period) html += ' &middot; ' + escapeHtml(period);
-                if (hasTimeEntries) html += ' &middot; <span style="color:var(--warning,#F59E0B);">' + teCount + ' time entr' + (teCount === 1 ? 'y' : 'ies') + ' linked</span>';
-                html += '</div>';
-                html += '</div>';
-                html += '</div>';
+                html += '<tr>';
+                html += '<td><input type="checkbox" data-inv="' + idx + '" data-detail="' + dIdx + '" class="inv-line-cb"></td>';
+                html += '<td class="invoice-line-desc">' + escapeHtml(desc) + '</td>';
+                html += '<td class="invoice-line-num">' + escapeHtml(String(qty)) + '</td>';
+                html += '<td class="invoice-line-num">EUR ' + escapeHtml(price) + '</td>';
+                html += '<td class="invoice-line-period">' + escapeHtml(period || '-') + '</td>';
+                html += '<td class="invoice-line-links">' + (hasTimeEntries ? teCount + ' linked' : '-') + '</td>';
+                html += '</tr>';
             });
+            html += '</tbody></table></div>';
         } else {
-            html += '<p style="padding:8px 0;font-size:0.85rem;color:var(--muted);">No detail lines</p>';
+            html += '<p class="invoice-no-lines">No detail lines</p>';
         }
         html += '</div>';
-        html += '</div>';
+        html += '</article>';
     });
+    html += '</div>';
 
     list.innerHTML = html;
 }
@@ -1071,12 +1072,12 @@ function renderConceptInvoicesList() {
 function toggleInvoiceDetails(idx) {
     var details = document.getElementById('invoiceDetails' + idx);
     var chevron = document.getElementById('invoiceChevron' + idx);
-    if (details.style.display === 'none') {
-        details.style.display = 'block';
-        chevron.style.transform = 'rotate(180deg)';
+    if (details.hidden) {
+        details.hidden = false;
+        chevron.classList.add('is-open');
     } else {
-        details.style.display = 'none';
-        chevron.style.transform = '';
+        details.hidden = true;
+        chevron.classList.remove('is-open');
     }
 }
 
@@ -1177,61 +1178,57 @@ async function linkHoursToInvoice(invIdx) {
 function showTimeEntryPicker(title, items) {
     return new Promise(function(resolve) {
         var overlay = document.createElement('div');
-        overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);backdrop-filter:blur(4px);z-index:2000;display:flex;align-items:center;justify-content:center;';
+        overlay.className = 'te-picker-overlay';
 
         var modal = document.createElement('div');
-        modal.style.cssText = 'background:var(--surface,#1E293B);border:1px solid var(--border,#334155);border-radius:12px;padding:24px;min-width:400px;max-width:600px;max-height:80vh;display:flex;flex-direction:column;color:var(--text,#F1F5F9);';
+        modal.className = 'te-picker-modal';
 
         var heading = document.createElement('h3');
         heading.textContent = title;
-        heading.style.cssText = 'margin:0 0 12px;font-size:1rem;';
+        heading.className = 'te-picker-title';
         modal.appendChild(heading);
 
         var selectBar = document.createElement('div');
-        selectBar.style.cssText = 'display:flex;gap:8px;margin-bottom:12px;';
+        selectBar.className = 'te-picker-selectbar';
         var selAllBtn = document.createElement('button');
         selAllBtn.textContent = 'Select All';
         selAllBtn.className = 'btn btn-sm btn-ghost';
-        selAllBtn.style.cssText = '';
         selAllBtn.onclick = function() { modal.querySelectorAll('.te-pick-cb').forEach(function(cb) { cb.checked = true; }); };
         var desAllBtn = document.createElement('button');
         desAllBtn.textContent = 'Deselect All';
         desAllBtn.className = 'btn btn-sm btn-ghost';
-        desAllBtn.style.cssText = '';
         desAllBtn.onclick = function() { modal.querySelectorAll('.te-pick-cb').forEach(function(cb) { cb.checked = false; }); };
         selectBar.appendChild(selAllBtn);
         selectBar.appendChild(desAllBtn);
         modal.appendChild(selectBar);
 
         var list = document.createElement('div');
-        list.style.cssText = 'overflow-y:auto;flex:1;margin-bottom:16px;border:1px solid var(--border,#e5e7eb);border-radius:8px;';
+        list.className = 'te-picker-list';
 
         if (items.length === 0) {
-            list.innerHTML = '<p style="padding:20px;text-align:center;color:var(--muted);">No open time entries found</p>';
+            list.innerHTML = '<p class="te-picker-empty">No open time entries found</p>';
         } else {
-            var html = '';
+            var html = '<table class="te-picker-table">';
+            html += '<thead><tr><th></th><th>Date</th><th>Hours</th><th>Contact</th><th>Description</th></tr></thead><tbody>';
             items.forEach(function(item) {
-                var bg = item.match ? '' : 'background:var(--surface,#f9fafb);';
-                html += '<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--border,#334155);' + bg + '">';
-                html += '<input type="checkbox" class="te-pick-cb" data-id="' + item.id + '"' + (item.match ? ' checked' : '') + '>';
-                html += '<div style="flex:1;min-width:0;">';
-                html += '<div style="font-size:0.85rem;font-weight:500;">' + escapeHtml(item.date) + ' &middot; ' + item.hours.toFixed(1) + 'h</div>';
-                html += '<div style="font-size:0.75rem;color:var(--muted);">' + escapeHtml(item.desc) + '</div>';
-                if (!item.match) {
-                    html += '<div style="font-size:0.7rem;color:var(--warning,#F59E0B);">Contact: ' + escapeHtml(item.contact) + '</div>';
-                }
-                html += '</div></div>';
+                html += '<tr class="' + (item.match ? '' : 'te-picker-mismatch') + '">';
+                html += '<td><input type="checkbox" class="te-pick-cb" data-id="' + item.id + '"' + (item.match ? ' checked' : '') + '></td>';
+                html += '<td class="te-picker-date">' + escapeHtml(item.date) + '</td>';
+                html += '<td class="te-picker-hours">' + item.hours.toFixed(1) + 'h</td>';
+                html += '<td class="te-picker-contact">' + escapeHtml(item.contact) + '</td>';
+                html += '<td class="te-picker-desc">' + escapeHtml(item.desc || '-') + '</td>';
+                html += '</tr>';
             });
+            html += '</tbody></table>';
             list.innerHTML = html;
         }
         modal.appendChild(list);
 
         var btnRow = document.createElement('div');
-        btnRow.style.cssText = 'display:flex;gap:8px;justify-content:flex-end;';
+        btnRow.className = 'te-picker-actions';
         var cancelBtn = document.createElement('button');
         cancelBtn.textContent = 'Cancel';
         cancelBtn.className = 'btn btn-ghost';
-        cancelBtn.style.cssText = '';
         cancelBtn.onclick = function() { document.body.removeChild(overlay); resolve(null); };
         var addBtn = document.createElement('button');
         addBtn.textContent = 'Add Selected';

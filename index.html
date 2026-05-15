@@ -17,21 +17,25 @@
             <p class="text-sm text-muted" style="margin:4px 0 0 0;">Hour registration with Git integration</p>
         </div>
         <div class="header-actions">
-            <button class="btn btn-ghost" onclick="toggleCustomerOverview()">Overview</button>
             <button class="btn btn-ghost" onclick="openSettings()">Settings</button>
         </div>
     </div>
 
     <!-- Customer Financial Overview -->
-    <div class="card" id="customerOverviewPanel" style="display:none;">
-        <div class="card-header">
-            <div>
-                <h3 class="card-title">Financial Overview</h3>
-                <p class="card-subtitle" id="overviewMonthLabel">-</p>
-            </div>
-            <button class="btn btn-ghost" onclick="toggleCustomerOverview()">Close</button>
-        </div>
-        <div id="customerOverviewBody"></div>
+    <div class="card executive-overview" id="customerOverviewPanel">
+        <details id="customerOverviewDetails" open>
+            <summary class="executive-overview-summary">
+                <div class="executive-overview-title-wrap">
+                    <h3 class="card-title">Financial Overview</h3>
+                    <p class="card-subtitle" id="overviewMonthLabel">-</p>
+                </div>
+                <div class="executive-overview-summary-metrics">
+                    <span class="summary-pill" id="overviewSummaryHours">0.0h</span>
+                    <span class="summary-pill" id="overviewSummaryRevenue">EUR 0,00</span>
+                </div>
+            </summary>
+            <div id="customerOverviewBody"></div>
+        </details>
     </div>
 
     <!-- Hour Type Selection -->
@@ -103,13 +107,28 @@
     <div class="main-grid">
         <!-- Left: Calendar & Git -->
         <div class="calendar-section">
+            <div class="planning-top-grid">
+                <!-- Jobs (Facturable only) -->
+                <div class="card" id="jobsCard">
+                    <div class="jobs-card-header">
+                        <h4 class="card-title jobs-card-title">Jobs</h4>
+                        <button class="btn btn-sm btn-primary" onclick="openJobEditor()">+ Add</button>
+                    </div>
+                    <div id="jobsList"></div>
+                </div>
+
+                <!-- Description -->
+                <div class="card description-card">
+                    <h4 class="card-title description-card-title">Description</h4>
+                    <input type="text" id="desc" placeholder="Description for invoice">
+                    <textarea id="wbsoComment" rows="3" placeholder="Additional R&amp;D comments (WBSO only)" style="margin-top:10px; display:none;"></textarea>
+                </div>
+            </div>
+
             <!-- Month Picker -->
             <div class="card">
                 <div class="month-picker-row">
                     <input type="month" id="monthPicker" onchange="renderCalendar()">
-                    <button class="btn btn-secondary" onclick="fetchExistingHours()">Manage Hours</button>
-                    <button class="btn btn-ghost" onclick="fetchOpenHours()">Open Hours</button>
-                    <button class="btn btn-ghost" onclick="fetchConceptInvoices()">Invoices</button>
                 </div>
 
                 <!-- Month Title -->
@@ -128,6 +147,10 @@
                     <div class="calendar-header">Total</div>
                 </div>
                 <div class="calendar-grid" id="calendarGrid"></div>
+
+                <!-- Schedule Grid (Facturable only, integrated between calendar and week overview) -->
+                <div id="scheduleGrid" class="calendar-schedule-embed" style="display:none;"></div>
+
                 <div id="monthSummary"></div>
             </div>
 
@@ -171,10 +194,17 @@
             <div class="action-bar" id="mainActionBar">
                 <span class="status" id="selectionCount">0 days selected</span>
                 <div class="buttons">
-                    <button class="btn btn-ghost" onclick="fetchExistingHours()">Manage</button>
-                    <button class="btn btn-ghost" onclick="clearAll()">Clear</button>
-                    <button class="btn btn-secondary" onclick="previewSelection()">Preview</button>
-                    <button class="btn btn-primary" onclick="startRegistration()">Register</button>
+                    <div class="action-bar-group action-bar-group-secondary">
+                        <button class="btn btn-ghost" onclick="fetchExistingHours()">Manage Hours</button>
+                        <button class="btn btn-ghost" onclick="fetchOpenHours()">Open Hours</button>
+                        <button class="btn btn-ghost" onclick="fetchConceptInvoices()">Invoices</button>
+                    </div>
+                    <div class="action-bar-divider" aria-hidden="true"></div>
+                    <div class="action-bar-group action-bar-group-primary">
+                        <button class="btn btn-ghost" onclick="clearAll()">Clear</button>
+                        <button class="btn btn-secondary" onclick="previewSelection()">Preview</button>
+                        <button class="btn btn-primary" onclick="startRegistration()">Register</button>
+                    </div>
                 </div>
             </div>
 
@@ -210,18 +240,6 @@
 
         <!-- Right Sidebar -->
         <div class="sidebar">
-            <!-- Jobs (Facturable only) -->
-            <div class="card" id="jobsCard">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-                    <h4 class="card-title" style="margin:0;">Jobs</h4>
-                    <button class="btn btn-sm btn-primary" onclick="openJobEditor()">+ Add</button>
-                </div>
-                <div id="jobsList"></div>
-            </div>
-
-            <!-- Schedule Grid (Facturable only, Excel-like per-date toggles) -->
-            <div class="card" id="scheduleGrid" style="display:none;"></div>
-
             <!-- Working Hours (WBSO only) -->
             <div class="card" id="workingHoursCard" style="display:none;">
                 <h4 class="card-title" style="margin:0 0 12px 0;">Working Hours</h4>
@@ -258,13 +276,6 @@
                 <div id="projectPicker" class="project-picker">
                     <span class="text-sm text-muted">Loading projects...</span>
                 </div>
-            </div>
-
-            <!-- Description -->
-            <div class="card">
-                <h4 class="card-title" style="margin:0 0 12px 0;">Description</h4>
-                <input type="text" id="desc" placeholder="Description for invoice">
-                <textarea id="wbsoComment" rows="3" placeholder="Additional R&amp;D comments (WBSO only)" style="margin-top:10px; display:none;"></textarea>
             </div>
         </div>
     </div>

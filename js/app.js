@@ -28,6 +28,16 @@ function init() {
     updateGitSourceUI();
     updateAzureAuthUI();
     updateCommitBasedUI();
+    renderCustomerOverview();
+
+    const overviewDetails = document.getElementById('customerOverviewDetails');
+    if (overviewDetails) {
+        overviewDetails.addEventListener('toggle', () => {
+            if (overviewDetails.open) {
+                renderCustomerOverview();
+            }
+        });
+    }
 }
 
 // --- EVENT BINDINGS ---

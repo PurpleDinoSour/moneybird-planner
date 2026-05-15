@@ -76,74 +76,78 @@ function renderCustomerOverview() {
     var titleEl = document.getElementById('overviewMonthLabel');
     if (titleEl) titleEl.textContent = monthLabel;
 
+    var summaryHoursEl = document.getElementById('overviewSummaryHours');
+    if (summaryHoursEl) summaryHoursEl.textContent = data.totals.hours.toFixed(1) + 'h';
+
+    var summaryRevenueEl = document.getElementById('overviewSummaryRevenue');
+    if (summaryRevenueEl) summaryRevenueEl.textContent = formatEur(data.totals.incl);
+
     if (data.jobs.length === 0) {
-        container.innerHTML = '<p style="text-align:center; color:var(--muted); padding:24px 0;">No jobs configured. Add jobs to see financial overview.</p>';
+        container.innerHTML = '<p class="overview-empty">No jobs configured. Add jobs to see financial overview.</p>';
         return;
     }
 
-    var maxHours = Math.max.apply(null, data.jobs.map(function(j) { return j.hours; })) || 1;
-    var maxExcl = Math.max.apply(null, data.jobs.map(function(j) { return j.excl; })) || 1;
+    var sortedJobs = data.jobs.slice().sort(function(a, b) {
+        return b.incl - a.incl;
+    });
 
     var html = '';
 
-    // Per-job cards
-    html += '<div class="overview-grid">';
-    data.jobs.forEach(function(job) {
-        var hoursPercent = Math.round((job.hours / maxHours) * 100);
-        var revenuePercent = job.excl > 0 ? Math.round((job.excl / maxExcl) * 100) : 0;
+    html += '<div class="overview-kpis">';
+    html += '<div class="overview-kpi"><span class="overview-kpi-label">Total Hours</span><span class="overview-kpi-value">' + data.totals.hours.toFixed(1) + 'h</span></div>';
+    html += '<div class="overview-kpi"><span class="overview-kpi-label">Excl. BTW</span><span class="overview-kpi-value">' + formatEur(data.totals.excl) + '</span></div>';
+    html += '<div class="overview-kpi overview-kpi-highlight"><span class="overview-kpi-label">Incl. BTW</span><span class="overview-kpi-value">' + formatEur(data.totals.incl) + '</span></div>';
+    html += '<div class="overview-kpi"><span class="overview-kpi-label">Active Jobs</span><span class="overview-kpi-value">' + sortedJobs.length + '</span></div>';
+    html += '</div>';
 
-        html += '<div class="overview-card">';
-        html += '<div class="overview-card-header">';
-        html += '<span class="overview-dot" style="background:' + job.color + ';"></span>';
+    html += '<div class="overview-table-wrap">';
+    html += '<table class="overview-table">';
+    html += '<thead><tr>';
+    html += '<th>Customer</th>';
+    html += '<th>Hours</th>';
+    html += '<th>Rate</th>';
+    html += '<th>Excl. BTW</th>';
+    html += '<th>Incl. BTW</th>';
+    html += '<th>Share</th>';
+    html += '</tr></thead><tbody>';
+
+    sortedJobs.forEach(function(job) {
+        var share = data.totals.incl > 0 ? (job.incl / data.totals.incl) * 100 : 0;
+        var dotColor = getExecutiveCustomerColor(job.color, 'dot');
+        var shareBarColor = getExecutiveCustomerColor(job.color, 'bar');
+        html += '<tr>';
+        html += '<td>';
+        html += '<div class="overview-customer">';
+        html += '<span class="overview-dot" style="background:' + dotColor + ';"></span>';
         html += '<span class="overview-name">' + escapeHtml(job.name) + '</span>';
-        html += '<span class="overview-rate">' + (job.rate > 0 ? '\u20AC' + job.rate.toFixed(2).replace('.', ',') + '/h' : 'No rate set') + '</span>';
         html += '</div>';
-
-        // Hours bar
-        html += '<div class="overview-metric">';
-        html += '<div class="overview-metric-label"><span>Hours</span><span class="overview-metric-value">' + job.hours.toFixed(1) + 'h</span></div>';
-        html += '<div class="overview-bar-track"><div class="overview-bar" style="width:' + hoursPercent + '%; background:' + job.color + ';"></div></div>';
+        html += '</td>';
+        html += '<td class="overview-num">' + job.hours.toFixed(1) + 'h</td>';
+        html += '<td class="overview-num">' + (job.rate > 0 ? '\u20AC ' + job.rate.toFixed(2).replace('.', ',') : '-') + '</td>';
+        html += '<td class="overview-num">' + formatEur(job.excl) + '</td>';
+        html += '<td class="overview-num">' + formatEur(job.incl) + '</td>';
+        html += '<td>';
+        html += '<div class="overview-share">';
+        html += '<div class="overview-share-track"><div class="overview-share-bar" style="width:' + share.toFixed(1) + '%; background:' + shareBarColor + ';"></div></div>';
+        html += '<span class="overview-share-value">' + share.toFixed(1) + '%</span>';
         html += '</div>';
-
-        // Revenue bar
-        html += '<div class="overview-metric">';
-        html += '<div class="overview-metric-label"><span>Excl. BTW</span><span class="overview-metric-value">' + formatEur(job.excl) + '</span></div>';
-        html += '<div class="overview-bar-track"><div class="overview-bar" style="width:' + revenuePercent + '%; background:' + job.color + '; opacity:0.7;"></div></div>';
-        html += '</div>';
-
-        // Incl BTW
-        html += '<div class="overview-metric">';
-        html += '<div class="overview-metric-label"><span>Incl. BTW (21%)</span><span class="overview-metric-value">' + formatEur(job.incl) + '</span></div>';
-        html += '</div>';
-
-        html += '</div>';
+        html += '</td>';
+        html += '</tr>';
     });
-    html += '</div>';
-
-    // Totals summary
-    html += '<div class="overview-totals">';
-    html += '<div class="overview-total-item">';
-    html += '<span class="overview-total-label">Total Hours</span>';
-    html += '<span class="overview-total-value">' + data.totals.hours.toFixed(1) + 'h</span>';
-    html += '</div>';
-    html += '<div class="overview-total-item">';
-    html += '<span class="overview-total-label">Total Excl. BTW</span>';
-    html += '<span class="overview-total-value">' + formatEur(data.totals.excl) + '</span>';
-    html += '</div>';
-    html += '<div class="overview-total-item highlight">';
-    html += '<span class="overview-total-label">Total Incl. BTW (21%)</span>';
-    html += '<span class="overview-total-value">' + formatEur(data.totals.incl) + '</span>';
-    html += '</div>';
-    html += '</div>';
+    html += '</tbody></table></div>';
 
     container.innerHTML = html;
 }
 
+function isOverviewExpanded() {
+    var details = document.getElementById('customerOverviewDetails');
+    return !!(details && details.open);
+}
+
 // Toggle overview visibility
 function toggleCustomerOverview() {
-    var panel = document.getElementById('customerOverviewPanel');
-    if (!panel) return;
-    var isHidden = panel.style.display === 'none';
-    panel.style.display = isHidden ? 'block' : 'none';
-    if (isHidden) renderCustomerOverview();
+    var details = document.getElementById('customerOverviewDetails');
+    if (!details) return;
+    details.open = !details.open;
+    if (details.open) renderCustomerOverview();
 }
