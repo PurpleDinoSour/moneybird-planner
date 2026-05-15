@@ -637,7 +637,7 @@ function openJobEditor(jobId) {
 
     // Buttons
     html += '<div style="display:flex; gap:8px; justify-content:flex-end; margin-top:16px;">';
-    html += '<button class="btn btn-ghost" onclick="closeJobEditor()" style="background:#e5e7eb; color:#374151;">Cancel</button>';
+    html += '<button class="btn btn-ghost" onclick="closeJobEditor()">Cancel</button>';
     html += '<button class="btn btn-primary" onclick="saveJobFromEditor(\'' + job.id + '\', ' + isNew + ')">Save</button>';
     html += '</div>';
 

@@ -3,11 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🐦 Moneybird Planner IV</title>
-    <!-- Google Fonts - Inter -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <title>Moneybird Planner IV</title>
     <!-- Application Styles -->
     <link rel="stylesheet" href="css/styles.css">
 </head>
@@ -17,12 +13,12 @@
     <!-- Header -->
     <div class="header">
         <div>
-            <h1>🐦 Moneybird Planner IV</h1>
+            <h1>Moneybird Planner</h1>
             <p class="text-sm text-muted" style="margin:4px 0 0 0;">Hour registration with Git integration</p>
         </div>
         <div class="header-actions">
-            <button class="btn btn-ghost" onclick="toggleCustomerOverview()" style="background:#ecfdf5; color:#059669; border:1px solid #a7f3d0;">&#128200; Overview</button>
-            <button class="btn btn-ghost" onclick="openSettings()" style="background:#e5e7eb; color:var(--text);">&#9881; Settings</button>
+            <button class="btn btn-ghost" onclick="toggleCustomerOverview()">Overview</button>
+            <button class="btn btn-ghost" onclick="openSettings()">Settings</button>
         </div>
     </div>
 
@@ -30,10 +26,10 @@
     <div class="card" id="customerOverviewPanel" style="display:none;">
         <div class="card-header">
             <div>
-                <h3 class="card-title">&#128200; Financial Overview</h3>
+                <h3 class="card-title">Financial Overview</h3>
                 <p class="card-subtitle" id="overviewMonthLabel">-</p>
             </div>
-            <button class="btn btn-ghost" onclick="toggleCustomerOverview()" style="background:#e5e7eb; color:#374151; font-size:1.2rem; padding:4px 10px;">&#10005;</button>
+            <button class="btn btn-ghost" onclick="toggleCustomerOverview()">Close</button>
         </div>
         <div id="customerOverviewBody"></div>
     </div>
@@ -41,12 +37,10 @@
     <!-- Hour Type Selection -->
     <div class="hour-type-tabs">
         <div class="hour-type-tab facturable active" onclick="setHourType('facturable')">
-            <div class="icon">💼</div>
             <div class="label">Facturable</div>
             <div class="desc">BV Administration</div>
         </div>
         <div class="hour-type-tab wbso" onclick="setHourType('wbso')">
-            <div class="icon">🔬</div>
             <div class="label">WBSO (R&D)</div>
             <div class="desc">Holding Administration</div>
         </div>
@@ -55,8 +49,8 @@
     <!-- WBSO Dashboard -->
     <div class="wbso-dashboard" id="wbsoDashboard">
         <div class="dashboard-header">
-            <span class="dashboard-title">📊 WBSO Budget</span>
-            <button class="dashboard-refresh" onclick="refreshWbsoDashboard()">🔄 Refresh</button>
+            <span class="dashboard-title">WBSO Budget</span>
+            <button class="dashboard-refresh" onclick="refreshWbsoDashboard()">Refresh</button>
         </div>
         <div class="dashboard-body">
             <div class="dashboard-main">
@@ -113,9 +107,9 @@
             <div class="card">
                 <div class="month-picker-row">
                     <input type="month" id="monthPicker" onchange="renderCalendar()">
-                    <button class="btn btn-secondary" onclick="fetchExistingHours()">📥 Manage Hours</button>
-                    <button class="btn btn-ghost" onclick="fetchOpenHours()" style="background:#fef2f2; color:#dc2626; border:1px solid #fecaca; font-size:0.8rem;">🧹 Open Hours</button>
-                    <button class="btn btn-ghost" onclick="fetchConceptInvoices()" style="background:#fff7ed; color:#c2410c; border:1px solid #fed7aa; font-size:0.8rem;">📄 Concept Invoices</button>
+                    <button class="btn btn-secondary" onclick="fetchExistingHours()">Manage Hours</button>
+                    <button class="btn btn-ghost" onclick="fetchOpenHours()">Open Hours</button>
+                    <button class="btn btn-ghost" onclick="fetchConceptInvoices()">Invoices</button>
                 </div>
 
                 <!-- Month Title -->
@@ -141,13 +135,13 @@
             <div class="card git-section" id="gitSection" style="display:none;">
                 <div class="card-header">
                     <div>
-                        <h3 class="card-title">🔗 Git Activity</h3>
+                        <h3 class="card-title">Git Activity</h3>
                         <p class="card-subtitle">Commits & Pull Requests for WBSO</p>
                     </div>
                     <div class="git-actions" style="margin:0;">
-                        <button class="btn btn-sm btn-primary" onclick="fetchAllGitData()">🔄 Fetch All</button>
-                        <button class="btn btn-sm btn-ghost" onclick="selectAllGitItems()" style="background:#d1fae5; color:var(--facturable);">✓ All</button>
-                        <button class="btn btn-sm btn-ghost" onclick="deselectAllGitItems()" style="background:#e5e7eb; color:#374151;">✗ None</button>
+                        <button class="btn btn-sm btn-primary" onclick="fetchAllGitData()">Fetch All</button>
+                        <button class="btn btn-sm btn-ghost" onclick="selectAllGitItems()">Select All</button>
+                        <button class="btn btn-sm btn-ghost" onclick="deselectAllGitItems()">Deselect</button>
                     </div>
                 </div>
 
@@ -157,7 +151,7 @@
                 </div>
 
                 <!-- WBSO Options -->
-                <div class="mt-4" style="padding:12px; background:#f5f3ff; border-radius:8px;">
+                <div class="mt-4" style="padding:12px; background:var(--bg-elevated); border:1px solid var(--border); border-radius:8px;">
                     <label class="checkbox-label mb-0">
                         <input type="checkbox" id="matchCommitsToDates" onchange="saveConfig(); updateCommitBasedUI()">
                         <span>Match commits to their actual dates</span>
@@ -166,7 +160,7 @@
                         <input type="checkbox" id="onlyDaysWithCommits" onchange="saveConfig()">
                         <span>Only register days with commits</span>
                     </label>
-                    <label class="checkbox-label mb-0" style="padding-top:12px; margin-top:8px; border-top:1px solid #e5e7eb;">
+                    <label class="checkbox-label mb-0" style="padding-top:12px; margin-top:8px; border-top:1px solid var(--border);">
                         <input type="checkbox" id="oneEntryPerCommit" onchange="saveConfig()" checked>
                         <span><strong>One entry per commit</strong> (recommended)</span>
                     </label>
@@ -177,10 +171,10 @@
             <div class="action-bar" id="mainActionBar">
                 <span class="status" id="selectionCount">0 days selected</span>
                 <div class="buttons">
-                    <button class="btn btn-ghost" onclick="fetchExistingHours()">📥 Manage</button>
+                    <button class="btn btn-ghost" onclick="fetchExistingHours()">Manage</button>
                     <button class="btn btn-ghost" onclick="clearAll()">Clear</button>
                     <button class="btn btn-secondary" onclick="previewSelection()">Preview</button>
-                    <button class="btn btn-primary" onclick="startRegistration()">🚀 Register</button>
+                    <button class="btn btn-primary" onclick="startRegistration()">Register</button>
                 </div>
             </div>
 
@@ -188,15 +182,15 @@
             <div class="card hours-management" id="hoursManagementSection" style="display:none;">
                 <div class="card-header">
                     <div>
-                        <h3 class="card-title">📋 Existing Hours</h3>
+                        <h3 class="card-title">Existing Hours</h3>
                         <p class="card-subtitle" id="hoursCount">0 entries loaded</p>
                     </div>
-                    <button class="btn btn-ghost" onclick="document.getElementById('hoursManagementSection').style.display='none';" style="background:#e5e7eb; color:#374151;">✕ Close</button>
+                    <button class="btn btn-ghost" onclick="document.getElementById('hoursManagementSection').style.display='none';">Close</button>
                 </div>
                 <div class="git-actions">
-                    <button class="btn btn-sm btn-secondary" onclick="selectAllHours()">✓ Select All</button>
-                    <button class="btn btn-sm btn-ghost" onclick="deselectAllHours()" style="background:#e5e7eb; color:#374151;">✗ Deselect</button>
-                    <button class="btn btn-sm btn-danger" onclick="deleteSelectedHours()">🗑️ Delete</button>
+                    <button class="btn btn-sm btn-secondary" onclick="selectAllHours()">Select All</button>
+                    <button class="btn btn-sm btn-ghost" onclick="deselectAllHours()">Deselect</button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteSelectedHours()">Delete</button>
                 </div>
                 <div class="hours-list" id="hoursList"></div>
             </div>
@@ -205,10 +199,10 @@
             <div class="card" id="conceptInvoicesSection" style="display:none;">
                 <div class="card-header">
                     <div>
-                        <h3 class="card-title">📄 Concept Invoices</h3>
+                        <h3 class="card-title">Concept Invoices</h3>
                         <p class="card-subtitle" id="conceptInvoiceCount">0 invoices loaded</p>
                     </div>
-                    <button class="btn btn-ghost" onclick="document.getElementById('conceptInvoicesSection').style.display='none';" style="background:#e5e7eb; color:#374151;">✕ Close</button>
+                    <button class="btn btn-ghost" onclick="document.getElementById('conceptInvoicesSection').style.display='none';">Close</button>
                 </div>
                 <div id="conceptInvoicesList"></div>
             </div>
@@ -219,7 +213,7 @@
             <!-- Jobs (Facturable only) -->
             <div class="card" id="jobsCard">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-                    <h4 class="card-title" style="margin:0;">&#128188; Jobs</h4>
+                    <h4 class="card-title" style="margin:0;">Jobs</h4>
                     <button class="btn btn-sm btn-primary" onclick="openJobEditor()">+ Add</button>
                 </div>
                 <div id="jobsList"></div>
@@ -230,7 +224,7 @@
 
             <!-- Working Hours (WBSO only) -->
             <div class="card" id="workingHoursCard" style="display:none;">
-                <h4 class="card-title" style="margin:0 0 12px 0;">&#9200; Working Hours</h4>
+                <h4 class="card-title" style="margin:0 0 12px 0;">Working Hours</h4>
                 <!-- Facturable: From/To (hidden, kept for backward compat) -->
                 <div id="facturableTimeSettings" style="display:none;">
                     <div class="row">
@@ -260,7 +254,7 @@
 
             <!-- Quick Project Picker (WBSO only) -->
             <div class="card" id="projectPickerCard" style="display:none;">
-                <h4 class="card-title" style="margin:0 0 8px 0;">&#128194; Project</h4>
+                <h4 class="card-title" style="margin:0 0 8px 0;">Project</h4>
                 <div id="projectPicker" class="project-picker">
                     <span class="text-sm text-muted">Loading projects...</span>
                 </div>
@@ -268,7 +262,7 @@
 
             <!-- Description -->
             <div class="card">
-                <h4 class="card-title" style="margin:0 0 12px 0;">&#128221; Description</h4>
+                <h4 class="card-title" style="margin:0 0 12px 0;">Description</h4>
                 <input type="text" id="desc" placeholder="Description for invoice">
                 <textarea id="wbsoComment" rows="3" placeholder="Additional R&amp;D comments (WBSO only)" style="margin-top:10px; display:none;"></textarea>
             </div>
@@ -277,16 +271,16 @@
 </div>
 
 <!-- Settings Modal -->
-<div id="settingsModal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:1000; padding:20px; overflow-y:auto;">
-    <div style="max-width:700px; margin:40px auto; background:var(--card); border-radius:16px; padding:24px; box-shadow:var(--shadow-lg);">
+<div id="settingsModal" class="settings-modal">
+    <div class="modal-content">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-            <h2 style="margin:0;">⚙️ Settings</h2>
-            <button onclick="closeSettings()" style="background:none; border:none; font-size:1.5rem; cursor:pointer;">×</button>
+            <h2 style="margin:0; font-size:1.1rem;">Settings</h2>
+            <button onclick="closeSettings()" class="btn btn-ghost" style="font-size:1.2rem; padding:4px 10px;">x</button>
         </div>
 
         <!-- BV Settings -->
-        <div style="background:#f0fdf4; padding:16px; border-radius:10px; margin-bottom:16px;">
-            <h3 style="margin:0 0 12px 0; color:var(--facturable);">💼 BV Administration (Facturable)</h3>
+        <div style="background:var(--bg-elevated); padding:16px; border-radius:10px; margin-bottom:16px; border:1px solid var(--border);">
+            <h3 style="margin:0 0 12px 0; color:var(--facturable);">BV Administration (Facturable)</h3>
             <div class="row">
                 <div>
                     <label>API Token</label>
@@ -316,8 +310,8 @@
         </div>
 
         <!-- Holding Settings -->
-        <div style="background:#faf5ff; padding:16px; border-radius:10px; margin-bottom:16px;">
-            <h3 style="margin:0 0 12px 0; color:var(--wbso);">🔬 Holding Administration (WBSO)</h3>
+        <div style="background:var(--bg-elevated); padding:16px; border-radius:10px; margin-bottom:16px; border:1px solid var(--border);">
+            <h3 style="margin:0 0 12px 0; color:var(--wbso);">Holding Administration (WBSO)</h3>
             <div class="row">
                 <div>
                     <label>API Token</label>
@@ -348,7 +342,7 @@
                 <input type="checkbox" id="wbsoBillable" onchange="saveConfig()">
                 <span>Declarabel (mark WBSO hours as billable)</span>
             </label>
-            <div style="margin-top:12px; padding-top:12px; border-top:1px solid #e9d5ff;">
+            <div style="margin-top:12px; padding-top:12px; border-top:1px solid var(--border);">
                 <label>WBSO Budget (total hours)</label>
                 <input type="number" id="wbsoBudget" value="1210" min="0" step="1" onchange="saveConfig(); renderWbsoDashboard()" style="width:120px;">
                 <p class="text-sm text-muted" style="margin:4px 0 0 0;">Total hours allocated for WBSO period</p>
@@ -356,8 +350,8 @@
         </div>
 
         <!-- Git Settings -->
-        <div style="background:#eff6ff; padding:16px; border-radius:10px; margin-bottom:16px;">
-            <h3 style="margin:0 0 12px 0; color:#3b82f6;">🔗 Git Integration</h3>
+        <div style="background:var(--bg-elevated); padding:16px; border-radius:10px; margin-bottom:16px; border:1px solid var(--border);">
+            <h3 style="margin:0 0 12px 0; color:#60A5FA;">Git Integration</h3>
             <div class="row">
                 <div>
                     <label>Source</label>
@@ -415,12 +409,12 @@
                 <div style="margin-top:12px;">
                     <label>Projects</label>
                     <div style="display:flex; gap:8px; margin-bottom:8px;">
-                        <button class="btn btn-sm btn-primary" onclick="selectAllProjects()">✓ All</button>
-                        <button class="btn btn-sm btn-ghost" onclick="deselectAllProjects()" style="background:#e5e7eb; color:#374151;">✗ None</button>
-                        <button class="btn btn-sm btn-secondary" onclick="selectDefaultProjects()">⭐ Defaults</button>
-                        <button class="btn btn-sm btn-ghost" onclick="fetchAzureProjects()" style="background:#e5e7eb; color:#374151;">🔄 Fetch</button>
+                        <button class="btn btn-sm btn-primary" onclick="selectAllProjects()">All</button>
+                        <button class="btn btn-sm btn-ghost" onclick="deselectAllProjects()">None</button>
+                        <button class="btn btn-sm btn-secondary" onclick="selectDefaultProjects()">Defaults</button>
+                        <button class="btn btn-sm btn-ghost" onclick="fetchAzureProjects()">Fetch</button>
                     </div>
-                    <div id="azureProjectList" style="max-height:120px; overflow-y:auto; border:1px solid var(--border); border-radius:6px; background:white; padding:8px;">
+                    <div id="azureProjectList" style="max-height:120px; overflow-y:auto; border:1px solid var(--border); border-radius:6px; background:var(--bg-elevated); padding:8px;">
                         <label class="checkbox-label mb-0" style="padding:4px 0;">
                             <input type="checkbox" value="M365DSC_CICD_PRD" onchange="saveConfig()">
                             <span>M365DSC_CICD_PRD</span>
@@ -445,15 +439,15 @@
                     <p class="text-sm text-muted" style="margin:4px 0 0 0;">Comma-separated names. Leave empty for all.</p>
                 </div>
                 <div style="margin-top:12px;">
-                    <button class="btn btn-secondary" onclick="testAzureConnection()">🔗 Test Connection</button>
+                    <button class="btn btn-secondary" onclick="testAzureConnection()">Test Connection</button>
                 </div>
                 <div id="azureTestResult" style="margin-top:10px; padding:10px; border-radius:6px; display:none;"></div>
             </div>
         </div>
 
         <!-- Customer Profiles -->
-        <div style="background:#fef3c7; padding:16px; border-radius:10px; margin-bottom:16px;">
-            <h3 style="margin:0 0 12px 0; color:#92400e;">👥 Customer Profiles</h3>
+        <div style="background:var(--bg-elevated); padding:16px; border-radius:10px; margin-bottom:16px; border:1px solid var(--border);">
+            <h3 style="margin:0 0 12px 0; color:var(--warning);">Customer Profiles</h3>
             <p class="text-sm text-muted" style="margin:0 0 12px 0;">Manage customer names and colors. This safe file is synced through git between laptops. No API keys or secrets are stored here.</p>
 
             <!-- Add Customer Form -->
@@ -464,14 +458,14 @@
             </div>
 
             <!-- Customers List -->
-            <div id="customersList" style="max-height:200px; overflow-y:auto; border:1px solid var(--border); border-radius:6px; background:white; padding:8px;">
+            <div id="customersList" style="max-height:200px; overflow-y:auto; border:1px solid var(--border); border-radius:6px; background:var(--bg-elevated); padding:8px;">
                 <p style="padding:20px; text-align:center; color:var(--muted);">Loading customers...</p>
             </div>
         </div>
 
         <!-- Reset -->
         <div style="text-align:center; padding-top:12px; border-top:1px solid var(--border);">
-            <button class="btn btn-danger" onclick="if(confirm('Clear ALL settings?')) { localStorage.clear(); location.reload(); }">🗑️ Reset All Settings</button>
+            <button class="btn btn-danger" onclick="if(confirm('Clear ALL settings?')) { localStorage.clear(); location.reload(); }">Reset All Settings</button>
         </div>
     </div>
 </div>

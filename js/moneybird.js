@@ -401,7 +401,7 @@ function renderHoursList() {
     });
 
     // Summary header
-    var summaryHtml = '<div style="padding:12px 16px;background:var(--card-bg,#f8f9fa);border-radius:8px;margin-bottom:12px;border:1px solid var(--border,#e5e7eb);">';
+    var summaryHtml = '<div style="padding:12px 16px;background:var(--bg-elevated,#111827);border-radius:8px;margin-bottom:12px;border:1px solid var(--border,#334155);">';
     summaryHtml += '<div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;">';
     summaryHtml += '<div><strong>' + appState.fetchedEntries.length + '</strong> entries</div>';
     summaryHtml += '<div><strong>' + Object.keys(dayMap).length + '</strong> days</div>';
@@ -669,13 +669,13 @@ function renderOpenHoursList() {
         monthGroups[monthKey].hours += hours;
     });
 
-    var html = '<div style="padding:12px 16px;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;margin-bottom:12px;">';
+    var html = '<div style="padding:12px 16px;background:var(--danger-light,rgba(239,68,68,0.12));border:1px solid rgba(239,68,68,0.2);border-radius:8px;margin-bottom:12px;">';
     html += '<div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;align-items:center;">';
-    html += '<div><strong style="color:#dc2626;">⚠️ ' + entries.length + ' open (non-invoiced) entries</strong></div>';
+    html += '<div><strong style="color:var(--danger,#EF4444);">' + entries.length + ' open (non-invoiced) entries</strong></div>';
     html += '<div><strong>' + totalHours.toFixed(1) + 'h</strong> total</div>';
     html += '<div>' + Object.keys(monthGroups).length + ' month(s)</div>';
     html += '</div>';
-    html += '<p style="margin:8px 0 0;font-size:0.85rem;color:#991b1b;">These time entries are not linked to any invoice. Select and delete duplicates.</p>';
+    html += '<p style="margin:8px 0 0;font-size:0.85rem;color:var(--danger,#EF4444);">These time entries are not linked to any invoice. Select and delete duplicates.</p>';
     html += '</div>';
 
     // Render entries grouped by month
@@ -686,7 +686,7 @@ function renderOpenHoursList() {
         var parts = monthKey.split('-');
         var label = monthNames[parseInt(parts[1]) - 1] + ' ' + parts[0];
 
-        html += '<div style="margin-top:12px;padding:6px 12px;background:var(--card-bg,#f8f9fa);border-radius:6px;font-weight:600;font-size:0.85rem;display:flex;justify-content:space-between;">';
+        html += '<div style="margin-top:12px;padding:6px 12px;background:var(--bg-elevated,#111827);border-radius:6px;font-weight:600;font-size:0.85rem;display:flex;justify-content:space-between;">';
         html += '<span>' + label + '</span>';
         html += '<span>' + group.entries.length + ' entries / ' + group.hours.toFixed(1) + 'h</span>';
         html += '</div>';
@@ -720,7 +720,7 @@ function showPickerModal(title, items) {
         overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:10000;display:flex;align-items:center;justify-content:center;';
 
         var modal = document.createElement('div');
-        modal.style.cssText = 'background:var(--card-bg,#1e1e2e);border:1px solid var(--border,#444);border-radius:12px;padding:24px;min-width:360px;max-width:500px;max-height:80vh;display:flex;flex-direction:column;color:var(--text,#cdd6f4);';
+        modal.style.cssText = 'background:var(--surface,#1E293B);border:1px solid var(--border,#334155);border-radius:12px;padding:24px;min-width:360px;max-width:500px;max-height:80vh;display:flex;flex-direction:column;color:var(--text,#F1F5F9);';
 
         var heading = document.createElement('h3');
         heading.textContent = title;
@@ -749,7 +749,7 @@ function showPickerModal(title, items) {
 
             var btn = document.createElement('button');
             btn.textContent = 'Select';
-            btn.style.cssText = 'margin-left:12px;padding:6px 14px;border:none;border-radius:6px;background:var(--primary,#89b4fa);color:#000;font-weight:600;cursor:pointer;flex-shrink:0;';
+            btn.style.cssText = 'margin-left:12px;padding:6px 14px;border:none;border-radius:6px;background:var(--accent,#10B981);color:#fff;font-weight:600;cursor:pointer;flex-shrink:0;';
 
             btn.onclick = function(e) {
                 e.stopPropagation();
@@ -1011,7 +1011,7 @@ function renderConceptInvoicesList() {
         if (invoiceDate && invoiceDate.length > 10) invoiceDate = invoiceDate.substring(0, 10);
 
         html += '<div style="border:1px solid var(--border,#e5e7eb);border-radius:8px;margin-bottom:8px;overflow:hidden;">';
-        html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--card-bg,#f8f9fa);cursor:pointer;" onclick="toggleInvoiceDetails(' + idx + ')">';
+        html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--bg-elevated,#111827);cursor:pointer;" onclick="toggleInvoiceDetails(' + idx + ')">';
         html += '<div>';
         html += '<div style="font-weight:600;font-size:0.9rem;">' + escapeHtml(contactName) + '</div>';
         html += '<div style="font-size:0.78rem;color:var(--muted);">';
@@ -1028,11 +1028,11 @@ function renderConceptInvoicesList() {
         // Detail lines (collapsed by default)
         html += '<div id="invoiceDetails' + idx + '" style="display:none;padding:0 14px 10px;">';
         html += '<div style="margin:8px 0 6px;display:flex;gap:8px;flex-wrap:wrap;">';
-        html += '<button class="btn btn-sm btn-ghost" onclick="linkHoursToInvoice(' + idx + ')" style="background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd;">+ Add Hours</button>';
+        html += '<button class="btn btn-sm btn-secondary" onclick="linkHoursToInvoice(' + idx + ')">+ Add Hours</button>';
         if (inv.details && inv.details.length > 0) {
-            html += '<button class="btn btn-sm btn-ghost" onclick="selectAllInvoiceLines(' + idx + ')" style="background:#d1fae5;color:#059669;">Select All</button>';
-            html += '<button class="btn btn-sm btn-ghost" onclick="deselectAllInvoiceLines(' + idx + ')" style="background:#e5e7eb;color:#374151;">Deselect All</button>';
-            html += '<button class="btn btn-sm btn-ghost" onclick="detachSelectedLines(' + idx + ')" style="background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;">Detach Selected</button>';
+            html += '<button class="btn btn-sm btn-ghost" onclick="selectAllInvoiceLines(' + idx + ')">Select All</button>';
+            html += '<button class="btn btn-sm btn-ghost" onclick="deselectAllInvoiceLines(' + idx + ')">Deselect All</button>';
+            html += '<button class="btn btn-sm btn-ghost" onclick="detachSelectedLines(' + idx + ')">Detach Selected</button>';
         }
         html += '<button class="btn btn-sm btn-danger" onclick="deleteConceptInvoice(' + idx + ')">Delete Invoice</button>';
         html += '</div>';
@@ -1046,14 +1046,14 @@ function renderConceptInvoicesList() {
                 var hasTimeEntries = detail.time_entry_ids && detail.time_entry_ids.length > 0;
                 var teCount = hasTimeEntries ? detail.time_entry_ids.length : 0;
 
-                html += '<div style="display:flex;align-items:flex-start;gap:8px;padding:6px 0;border-bottom:1px solid #f3f4f6;">';
+                html += '<div style="display:flex;align-items:flex-start;gap:8px;padding:6px 0;border-bottom:1px solid var(--border,#334155);">';
                 html += '<input type="checkbox" data-inv="' + idx + '" data-detail="' + dIdx + '" class="inv-line-cb" style="margin-top:3px;">';
                 html += '<div style="flex:1;min-width:0;">';
                 html += '<div style="font-size:0.82rem;font-weight:500;">' + escapeHtml(desc) + '</div>';
                 html += '<div style="font-size:0.75rem;color:var(--muted);">';
                 html += qty + ' x &euro;' + escapeHtml(price);
                 if (period) html += ' &middot; ' + escapeHtml(period);
-                if (hasTimeEntries) html += ' &middot; <span style="color:#c2410c;">' + teCount + ' time entr' + (teCount === 1 ? 'y' : 'ies') + ' linked</span>';
+                if (hasTimeEntries) html += ' &middot; <span style="color:var(--warning,#F59E0B);">' + teCount + ' time entr' + (teCount === 1 ? 'y' : 'ies') + ' linked</span>';
                 html += '</div>';
                 html += '</div>';
                 html += '</div>';
@@ -1177,10 +1177,10 @@ async function linkHoursToInvoice(invIdx) {
 function showTimeEntryPicker(title, items) {
     return new Promise(function(resolve) {
         var overlay = document.createElement('div');
-        overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:2000;display:flex;align-items:center;justify-content:center;';
+        overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);backdrop-filter:blur(4px);z-index:2000;display:flex;align-items:center;justify-content:center;';
 
         var modal = document.createElement('div');
-        modal.style.cssText = 'background:var(--card,#fff);border:1px solid var(--border,#e5e7eb);border-radius:12px;padding:24px;min-width:400px;max-width:600px;max-height:80vh;display:flex;flex-direction:column;';
+        modal.style.cssText = 'background:var(--surface,#1E293B);border:1px solid var(--border,#334155);border-radius:12px;padding:24px;min-width:400px;max-width:600px;max-height:80vh;display:flex;flex-direction:column;color:var(--text,#F1F5F9);';
 
         var heading = document.createElement('h3');
         heading.textContent = title;
@@ -1192,12 +1192,12 @@ function showTimeEntryPicker(title, items) {
         var selAllBtn = document.createElement('button');
         selAllBtn.textContent = 'Select All';
         selAllBtn.className = 'btn btn-sm btn-ghost';
-        selAllBtn.style.cssText = 'background:#d1fae5;color:#059669;';
+        selAllBtn.style.cssText = '';
         selAllBtn.onclick = function() { modal.querySelectorAll('.te-pick-cb').forEach(function(cb) { cb.checked = true; }); };
         var desAllBtn = document.createElement('button');
         desAllBtn.textContent = 'Deselect All';
         desAllBtn.className = 'btn btn-sm btn-ghost';
-        desAllBtn.style.cssText = 'background:#e5e7eb;color:#374151;';
+        desAllBtn.style.cssText = '';
         desAllBtn.onclick = function() { modal.querySelectorAll('.te-pick-cb').forEach(function(cb) { cb.checked = false; }); };
         selectBar.appendChild(selAllBtn);
         selectBar.appendChild(desAllBtn);
@@ -1212,13 +1212,13 @@ function showTimeEntryPicker(title, items) {
             var html = '';
             items.forEach(function(item) {
                 var bg = item.match ? '' : 'background:var(--surface,#f9fafb);';
-                html += '<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid #f3f4f6;' + bg + '">';
+                html += '<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--border,#334155);' + bg + '">';
                 html += '<input type="checkbox" class="te-pick-cb" data-id="' + item.id + '"' + (item.match ? ' checked' : '') + '>';
                 html += '<div style="flex:1;min-width:0;">';
                 html += '<div style="font-size:0.85rem;font-weight:500;">' + escapeHtml(item.date) + ' &middot; ' + item.hours.toFixed(1) + 'h</div>';
                 html += '<div style="font-size:0.75rem;color:var(--muted);">' + escapeHtml(item.desc) + '</div>';
                 if (!item.match) {
-                    html += '<div style="font-size:0.7rem;color:#c2410c;">Contact: ' + escapeHtml(item.contact) + '</div>';
+                    html += '<div style="font-size:0.7rem;color:var(--warning,#F59E0B);">Contact: ' + escapeHtml(item.contact) + '</div>';
                 }
                 html += '</div></div>';
             });
@@ -1231,7 +1231,7 @@ function showTimeEntryPicker(title, items) {
         var cancelBtn = document.createElement('button');
         cancelBtn.textContent = 'Cancel';
         cancelBtn.className = 'btn btn-ghost';
-        cancelBtn.style.cssText = 'background:#e5e7eb;color:#374151;';
+        cancelBtn.style.cssText = '';
         cancelBtn.onclick = function() { document.body.removeChild(overlay); resolve(null); };
         var addBtn = document.createElement('button');
         addBtn.textContent = 'Add Selected';

@@ -157,7 +157,7 @@ function renderCustomersList(customers) {
                 <span style="flex:1; font-weight:500;">${c.name}</span>
             </div>
             <div style="display:flex; gap:4px;">
-                <button class="btn btn-sm btn-ghost" onclick="deleteCustomerUI('${c.id}')" style="background:#fee2e2; color:#dc2626; padding:4px 8px;">🗑️ Delete</button>
+                <button class="btn btn-sm btn-danger" onclick="deleteCustomerUI('${c.id}')" style="padding:4px 8px;">Delete</button>
             </div>
         </div>
     `).join('');

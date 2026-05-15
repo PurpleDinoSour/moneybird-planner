@@ -62,7 +62,7 @@ async function fetchGitCommits() {
             <div class="git-item" onclick="toggleCommitSelection(${idx}, this)">
                 <input type="checkbox" ${appState.selectedCommits.includes(idx) ? 'checked' : ''} onclick="event.stopPropagation(); toggleCommitSelection(${idx}, this.parentElement)">
                 <div class="git-item-info">
-                    <div class="git-hash">${commit.hash.substring(0, 7)} <span style="margin-left:8px; padding:2px 6px; background:#e5e7eb; border-radius:4px; font-size:0.75rem; color:#374151;">${hpc}h</span></div>
+                    <div class="git-hash">${commit.hash.substring(0, 7)} <span style="margin-left:8px; padding:2px 6px; background:var(--surface,#1E293B); border:1px solid var(--border,#334155); border-radius:4px; font-size:0.75rem; color:var(--text-secondary,#94A3B8);">${hpc}h</span></div>
                     <div class="git-msg">${escapeHtml(commit.message)}</div>
                     <div class="git-meta">${commit.author} • ${commit.date}${commitTime ? ' @ ' + commitTime : ''}</div>
                 </div>
@@ -212,7 +212,7 @@ async function fetchGitPRs() {
             <div class="git-item" onclick="togglePRSelection(${idx}, this)">
                 <input type="checkbox" ${appState.selectedPRs.includes(idx) ? 'checked' : ''} onclick="event.stopPropagation(); togglePRSelection(${idx}, this.parentElement)">
                 <div class="git-item-info">
-                    <div class="git-hash">#${pr.number} <span style="margin-left:8px; padding:2px 6px; background:#e5e7eb; border-radius:4px; font-size:0.75rem; color:#374151;">${hpc}h</span></div>
+                    <div class="git-hash">#${pr.number} <span style="margin-left:8px; padding:2px 6px; background:var(--surface,#1E293B); border:1px solid var(--border,#334155); border-radius:4px; font-size:0.75rem; color:var(--text-secondary,#94A3B8);">${hpc}h</span></div>
                     <div class="git-msg">${escapeHtml(pr.title)}</div>
                     <div class="git-meta">${pr.author} • ${pr.date}${pr.status ? ' • ' + pr.status : ''}</div>
                 </div>
