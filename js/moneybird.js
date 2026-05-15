@@ -369,6 +369,7 @@ function renderHoursList() {
     var totalHours = 0;
     var dayMap = {};
     var lockedCount = 0;
+    var projectMap = {}; // projectId -> { hours, count }
     appState.fetchedEntries.forEach(function(entry) {
         var hours = parseEntryHours(entry);
         totalHours += hours;
@@ -379,6 +380,10 @@ function renderHoursList() {
         if (entry.events && entry.events.some(function(ev) { return ev.action === 'time_entry_invoice_added'; })) {
             lockedCount++;
         }
+        var pid = entry.project_id || (entry.project && entry.project.id) || '_none';
+        if (!projectMap[pid]) projectMap[pid] = { hours: 0, count: 0, name: (entry.project && entry.project.name) || 'No project' };
+        projectMap[pid].hours += hours;
+        projectMap[pid].count++;
     });
 
     // Summary header
@@ -391,6 +396,25 @@ function renderHoursList() {
         summaryHtml += '<div style="color:var(--warning,#f59e0b);">🔒 ' + lockedCount + ' on invoice</div>';
     }
     summaryHtml += '</div>';
+
+    // Per-project breakdown (DNB / RIVM / ...)
+    var projectKeys = Object.keys(projectMap);
+    if (projectKeys.length > 0) {
+        var pillsHtml = '<div class="hours-project-summary">';
+        projectKeys.forEach(function(pid) {
+            var info = projectMap[pid];
+            var matchJob = (appState.jobs || []).find(function(j) {
+                return j.projectId && String(j.projectId) === String(pid);
+            });
+            if (matchJob) {
+                pillsHtml += '<span class="hour-entry-pill" style="background:' + escapeHtml(matchJob.color || '#64748b') + ';">' + escapeHtml(matchJob.name) + '<strong>' + info.hours.toFixed(1) + 'h</strong></span>';
+            } else {
+                pillsHtml += '<span class="hour-entry-pill hour-entry-pill-unknown">' + escapeHtml(info.name) + '<strong>' + info.hours.toFixed(1) + 'h</strong></span>';
+            }
+        });
+        pillsHtml += '</div>';
+        summaryHtml += pillsHtml;
+    }
 
     // Compare with selected calendar dates
     var selectedDates = Array.from(appState.selectedDates).sort();
@@ -436,10 +460,28 @@ function renderHoursList() {
         var hours = parseEntryHours(entry);
         var isLocked = entry.events && entry.events.some(function(ev) { return ev.action === 'time_entry_invoice_added'; });
         var lockIcon = isLocked ? ' 🔒' : '';
+
+        // Match the entry's project to one of our configured jobs so we can
+        // show the customer name + colour dynamically (DNB / RIVM / ...).
+        var entryProjId = entry.project_id || (entry.project && entry.project.id) || null;
+        var projectPill = '';
+        if (entryProjId && appState.jobs && appState.jobs.length > 0) {
+            var matchJob = appState.jobs.find(function(j) {
+                return j.projectId && String(j.projectId) === String(entryProjId);
+            });
+            if (matchJob) {
+                projectPill = '<span class="hour-entry-pill" style="background:' + escapeHtml(matchJob.color || '#64748b') + ';">' + escapeHtml(matchJob.name) + '</span>';
+            } else if (entry.project && entry.project.name) {
+                projectPill = '<span class="hour-entry-pill hour-entry-pill-unknown">' + escapeHtml(entry.project.name) + '</span>';
+            }
+        } else if (entry.project && entry.project.name) {
+            projectPill = '<span class="hour-entry-pill hour-entry-pill-unknown">' + escapeHtml(entry.project.name) + '</span>';
+        }
+
         return '<div class="hour-entry">' +
             '<input type="checkbox" data-idx="' + idx + '"' + (isLocked ? ' title="Linked to invoice - cannot delete"' : '') + '>' +
             '<div class="hour-entry-info">' +
-                '<div class="hour-entry-date">' + formatEntryDate(entry.started_at) + ' &nbsp; ' + formatTimeRange(entry.started_at, entry.ended_at) + ' &nbsp; <strong>' + hours.toFixed(1) + 'h</strong>' + lockIcon + '</div>' +
+                '<div class="hour-entry-date">' + projectPill + formatEntryDate(entry.started_at) + ' &nbsp; ' + formatTimeRange(entry.started_at, entry.ended_at) + ' &nbsp; <strong>' + hours.toFixed(1) + 'h</strong>' + lockIcon + '</div>' +
                 '<div class="hour-entry-desc">' + escapeHtml(entry.description || 'No description') + '</div>' +
             '</div>' +
         '</div>';

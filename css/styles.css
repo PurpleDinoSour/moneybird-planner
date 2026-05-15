@@ -2425,3 +2425,38 @@ body.wbso-mode .tab.active { background: var(--wbso); border-color: var(--wbso);
     font-family: var(--font-mono);
     font-size: 0.72rem;
 }
+
+/* ===== Manage Hours: project pill + summary breakdown ===================== */
+.hour-entry-pill {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 0.65rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    color: #061a0d;
+    margin-right: 8px;
+    vertical-align: middle;
+    text-transform: uppercase;
+}
+.hour-entry-pill-unknown {
+    background: var(--surface);
+    color: var(--muted);
+    border: 1px dashed var(--border);
+    text-transform: none;
+    letter-spacing: 0;
+    font-weight: 600;
+}
+.hours-project-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 6px;
+}
+.hours-project-summary .hour-entry-pill {
+    margin-right: 0;
+}
+.hours-project-summary .hour-entry-pill strong {
+    margin-left: 6px;
+    font-weight: 800;
+}

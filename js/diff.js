@@ -25,6 +25,34 @@
         return e.project_id || (e.project && e.project.id) || null;
     }
 
+    // Hours computed from started_at / ended_at minus paused_duration.
+    // Mirrors parseEntryHours in moneybird.js so diff and Manage Hours stay
+    // consistent.
+    function entryHours(e) {
+        if (!e || !e.started_at || !e.ended_at) return null;
+        var s = new Date(e.started_at);
+        var en = new Date(e.ended_at);
+        if (isNaN(s) || isNaN(en)) return null;
+        var ms = en - s;
+        if (e.paused_duration) ms -= e.paused_duration * 1000;
+        return ms / 3600000;
+    }
+
+    function plannedHours(p) {
+        if (typeof p.hours === 'number') return p.hours;
+        if (!p.startTime || !p.endTime) return null;
+        var sp = p.startTime.split(':').map(Number);
+        var ep = p.endTime.split(':').map(Number);
+        var h = (ep[0] * 60 + (ep[1] || 0) - sp[0] * 60 - (sp[1] || 0)) / 60;
+        if (p.lunch) h -= 1;
+        return Math.max(0, h);
+    }
+
+    function hoursMatch(a, b) {
+        if (a === null || b === null) return true; // can't tell -> don't flag
+        return Math.abs(a - b) < 0.05; // 3-minute tolerance
+    }
+
     // Build a quick lookup of existing entries grouped by date.
     function indexExisting(existing) {
         const byDate = {};
@@ -45,22 +73,40 @@
         }
         const plannedProj = planned.projectId ? String(planned.projectId) : null;
         const plannedDesc = normaliseDescription(planned.description);
+        const plannedH    = plannedHours(planned);
+
+        // Collect all entries on the same project (matters for hour-diff and duplicates).
+        const sameProjectEntries = existingForDate.filter(e => {
+            const eProj = entryProjectId(e);
+            return plannedProj && eProj && String(eProj) === plannedProj;
+        });
 
         // Exact-ish match: same project + similar description.
-        for (const e of existingForDate) {
-            const eProj = entryProjectId(e);
+        for (const e of sameProjectEntries) {
             const eDesc = normaliseDescription(e.description);
-            if (plannedProj && eProj && String(eProj) === plannedProj && eDesc === plannedDesc) {
+            if (eDesc === plannedDesc) {
+                const eH = entryHours(e);
+                if (!hoursMatch(plannedH, eH)) {
+                    return {
+                        status: 'conflict',
+                        match: e,
+                        reason: 'Hours differ: planned ' + (plannedH != null ? plannedH.toFixed(1) : '?') + 'h vs registered ' + (eH != null ? eH.toFixed(1) : '?') + 'h'
+                    };
+                }
+                if (sameProjectEntries.length > 1) {
+                    return {
+                        status: 'conflict',
+                        match: e,
+                        reason: sameProjectEntries.length + ' entries already exist on this project for this date'
+                    };
+                }
                 return { status: 'existing', match: e, reason: 'Same project + description already exists' };
             }
         }
 
         // Same project, different description -> conflict (would create duplicate).
-        for (const e of existingForDate) {
-            const eProj = entryProjectId(e);
-            if (plannedProj && eProj && String(eProj) === plannedProj) {
-                return { status: 'conflict', match: e, reason: 'Existing entry on this project with a different description' };
-            }
+        if (sameProjectEntries.length > 0) {
+            return { status: 'conflict', match: sameProjectEntries[0], reason: 'Existing entry on this project with a different description' };
         }
 
         // Different project on same date is allowed (split day) -> still new.
