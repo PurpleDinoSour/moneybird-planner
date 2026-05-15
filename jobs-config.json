@@ -3,7 +3,7 @@
                  {
                      "id":  "job_1778866964287",
                      "name":  "DNB",
-                     "color":  "#f59e0b",
+                     "color":  "#B45309",
                      "projectId":  "483870075814676273",
                      "projectName":  "DNB",
                      "description":  "Consultancy uren",
@@ -59,7 +59,7 @@
                  {
                      "id":  "job_1778867041675",
                      "name":  "RIVM",
-                     "color":  "#3b82f6",
+                     "color":  "#1D4ED8",
                      "projectId":  "478308704970605831",
                      "projectName":  "Rijksinstituut voor Volksgezondheid en Milieu (RIVM)",
                      "description":  "Consultancy uren",
@@ -82,5 +82,5 @@
                                        }
                  }
              ],
-    "lastModified":  "2026-05-15T18:52:58.122Z"
+    "lastModified":  "2026-05-15T18:54:47.799Z"
 }
