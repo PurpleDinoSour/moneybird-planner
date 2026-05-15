@@ -14,7 +14,7 @@
     /* Typography */
     --text: #0F172A;               /* deep navy headings/body */
     --text-secondary: #475569;     /* slate body */
-    --muted: #94A3B8;              /* muted labels */
+    --muted: #64748B;              /* muted labels (slate-500, AA on white) */
     /* Brand: deep navy hero */
     --navy: #0F172A;
     --navy-2: #1E293B;
