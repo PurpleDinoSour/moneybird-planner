@@ -1071,13 +1071,13 @@ function renderConceptInvoicesList() {
                 var hasTimeEntries = detail.time_entry_ids && detail.time_entry_ids.length > 0;
                 var teCount = hasTimeEntries ? detail.time_entry_ids.length : 0;
 
-                html += '<tr>';
+                html += '<tr data-inv-row="' + idx + '" data-detail-idx="' + dIdx + '">';
                 html += '<td><input type="checkbox" data-inv="' + idx + '" data-detail="' + dIdx + '" class="inv-line-cb"></td>';
                 html += '<td class="invoice-line-desc">' + escapeHtml(desc) + '</td>';
-                html += '<td class="invoice-line-num">' + escapeHtml(String(qty)) + '</td>';
-                html += '<td class="invoice-line-num">EUR ' + escapeHtml(price) + '</td>';
+                html += '<td class="invoice-line-num" data-cell="qty">' + escapeHtml(String(qty)) + '</td>';
+                html += '<td class="invoice-line-num" data-cell="rate">EUR ' + escapeHtml(price) + '</td>';
                 html += '<td class="invoice-line-period">' + escapeHtml(period || '-') + '</td>';
-                html += '<td class="invoice-line-links">' + (hasTimeEntries ? teCount + ' linked' : '-') + '</td>';
+                html += '<td class="invoice-line-links" data-cell="links">' + (hasTimeEntries ? teCount + ' linked' : '-') + '</td>';
                 html += '<td class="invoice-line-action"><button type="button" class="btn btn-sm btn-secondary" onclick="billLineFromTimeEntries(' + idx + ', ' + dIdx + ')" title="Attach all time entries linked to this invoice to THIS line so Moneybird recomputes qty + rate">Bill from linked hours</button></td>';
                 html += '</tr>';
             });
@@ -1200,9 +1200,59 @@ async function loadInvoiceLinkedEntries(idx) {
         });
         rows += '</tbody></table>';
         body.innerHTML = summary + rows;
+        // Annotate detail line cells with the preview that Bill from linked hours would apply.
+        annotateInvoiceLinesWithPreview(idx);
     } catch (err) {
         body.innerHTML = '<p class="invoice-linked-error">Error loading linked entries: ' + escapeHtml(err.message) + '</p>';
     }
+}
+
+// Show 'qty -> 140.0', 'EUR 0.00 -> 107.50', 'N (preview)' on each unbilled line
+// of an invoice once we have its linked time entries cached.
+function annotateInvoiceLinesWithPreview(idx) {
+    var inv = appState.conceptInvoices[idx];
+    if (!inv || !inv.__linkedEntries || inv.__linkedEntries.length === 0) return;
+    var jobs = (window.appState && Array.isArray(appState.jobs)) ? appState.jobs : [];
+    var totalHours = 0;
+    var rateBuckets = {};
+    inv.__linkedEntries.forEach(function(e) {
+        var h = 0;
+        if (e.started_at && e.ended_at) {
+            h = (new Date(e.ended_at) - new Date(e.started_at)) / 3600000;
+            if (e.paused_duration) h -= e.paused_duration / 3600;
+        }
+        totalHours += h;
+        var pid = e.project_id || (e.project && e.project.id) || '';
+        var matchJob = jobs.find(function(j) { return String(j.projectId || '') === String(pid); });
+        var rate = matchJob && matchJob.hourlyRate ? matchJob.hourlyRate : 0;
+        if (!rateBuckets[rate]) rateBuckets[rate] = 0;
+        rateBuckets[rate] += h;
+    });
+    // Use the rate carrying the most hours as the representative rate.
+    var bestRate = 0, bestHours = -1;
+    Object.keys(rateBuckets).forEach(function(r) {
+        if (rateBuckets[r] > bestHours) { bestHours = rateBuckets[r]; bestRate = parseFloat(r); }
+    });
+    var entryCount = inv.__linkedEntries.length;
+    var rows = document.querySelectorAll('tr[data-inv-row="' + idx + '"]');
+    rows.forEach(function(tr) {
+        var dIdx = parseInt(tr.dataset.detailIdx, 10);
+        var detail = inv.details && inv.details[dIdx];
+        if (!detail) return;
+        // Only annotate lines that aren't billed from time entries yet.
+        if (detail.time_entry_ids && detail.time_entry_ids.length > 0) return;
+        var qtyCell = tr.querySelector('[data-cell="qty"]');
+        var rateCell = tr.querySelector('[data-cell="rate"]');
+        var linksCell = tr.querySelector('[data-cell="links"]');
+        if (qtyCell) qtyCell.innerHTML = escapeHtml(String(detail.amount || '1')) + ' <span class="invoice-line-preview">&rarr; ' + totalHours.toFixed(1) + '</span>';
+        if (rateCell) {
+            var currentRate = detail.price ? parseFloat(detail.price).toFixed(2) : '0.00';
+            if (bestRate > 0) {
+                rateCell.innerHTML = 'EUR ' + currentRate + ' <span class="invoice-line-preview">&rarr; ' + bestRate.toFixed(2) + '</span>';
+            }
+        }
+        if (linksCell) linksCell.innerHTML = entryCount + ' <span class="invoice-line-preview">(preview)</span>';
+    });
 }
 
 // Attach all time entries currently linked to the invoice to a specific detail line

@@ -2587,3 +2587,8 @@ body.wbso-mode .tab.active { background: var(--wbso); border-color: var(--wbso);
     border-bottom: 1px solid rgba(255, 255, 255, 0.04);
     color: var(--text);
 }
+.invoice-line-preview {
+    color: var(--accent);
+    font-weight: 600;
+    margin-left: 4px;
+}
