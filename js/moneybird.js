@@ -156,42 +156,11 @@ async function registerStandard(config, baseDesc, wbsoComment, matchCommitsToDat
         return;
     }
 
-    // Build entries: multi-job for facturable, single entry for WBSO
-    var entries = [];
-
-    if (appState.currentHourType === 'facturable' && appState.jobs.length > 0) {
-        dates.forEach(function(date) {
-            var jobsForDate = getJobsForDate(date);
-            jobsForDate.forEach(function(job) {
-                var sched = getScheduleForJobDate(job, date);
-                entries.push({
-                    date: date,
-                    description: job.description || baseDesc,
-                    startTime: sched.start,
-                    endTime: sched.end,
-                    lunch: sched.lunch,
-                    projectId: job.projectId,
-                    jobName: job.name
-                });
-            });
-        });
-    } else {
-        var fullDesc = baseDesc;
-        if (gitInfo) fullDesc += ' | ' + gitInfo;
-        if (wbsoComment) fullDesc += ' | ' + wbsoComment;
-
-        dates.forEach(function(date) {
-            entries.push({
-                date: date,
-                description: fullDesc,
-                startTime: document.getElementById('startTime').value,
-                endTime: document.getElementById('endTime').value,
-                lunch: document.getElementById('lunchBreak').checked,
-                projectId: config.projectId,
-                jobName: null
-            });
-        });
-    }
+    // Build entries via shared planning module so the diff classification
+    // matches exactly what we will POST.
+    var entries = window.planning
+        ? window.planning.buildPlannedEntries({ type: appState.currentHourType, dates: dates })
+        : [];
 
     if (entries.length === 0) {
         alert('No entries to register.');

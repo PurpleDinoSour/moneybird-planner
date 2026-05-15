@@ -236,6 +236,10 @@ function renderCalendar(forceRecompute) {
     if (document.getElementById('customerOverviewPanel')) {
         renderCustomerOverview();
     }
+    // Re-run the continuous diff overlay (cache hit if month unchanged).
+    if (window.autoDiff) window.autoDiff.triggerSoon();
+    // Render WBSO overlay bars (dual-mode) after each render.
+    if (window.wbsoOverlay) window.wbsoOverlay.refresh();
 }
 
 function renderMonthSummary(year, month) {
@@ -330,7 +334,7 @@ function toggleCard(el, dateStr) {
     }
     updateCounter();
     if (window.selectionState) window.selectionState.persistCurrent();
-    if (window.diffEngine) window.diffEngine.clearCalendarOverlay();
+    if (window.autoDiff) window.autoDiff.triggerSoon();
 }
 
 function updateCounter() {
@@ -348,7 +352,7 @@ function clearAll() {
         appState.selectedDates.clear();
         updateCounter();
         if (window.selectionState) window.selectionState.persistCurrent();
-        if (window.diffEngine) window.diffEngine.clearCalendarOverlay();
+        if (window.autoDiff) window.autoDiff.triggerSoon();
     }
 }
 
@@ -372,4 +376,5 @@ function selectAllCalendarDays() {
     }
     updateCounter();
     if (window.selectionState) window.selectionState.persistCurrent();
+    if (window.autoDiff) window.autoDiff.triggerSoon();
 }

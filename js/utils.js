@@ -334,6 +334,11 @@ function setHourType(type) {
 
     updateCounter();
     if (type === 'wbso') loadProjectPicker();
+    // Type switch swaps Moneybird admin -> invalidate auto-diff cache.
+    if (window.autoDiff) {
+        window.autoDiff.invalidate();
+        window.autoDiff.triggerSoon();
+    }
 }
 
 // --- UPDATE TIME NOTATION ---

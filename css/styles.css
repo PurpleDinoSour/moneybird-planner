@@ -2067,3 +2067,134 @@ body.wbso-mode .tab.active { background: var(--wbso); border-color: var(--wbso);
     background: var(--bg-elevated);
 }
 .diff-modal-actions .btn[disabled] { opacity: 0.5; cursor: not-allowed; }
+
+/* ===== Auto-diff badge + toggle chips (Round A/B additions) =============== */
+
+.action-bar-group-toggles {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.toggle-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px 5px 8px;
+    border-radius: 999px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--muted);
+    cursor: pointer;
+    transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+    user-select: none;
+}
+.toggle-chip:hover { color: var(--text); border-color: rgba(255,255,255,0.18); }
+.toggle-chip input[type=checkbox] {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    border: 1.5px solid var(--border);
+    margin: 0;
+    background: transparent;
+    cursor: pointer;
+    position: relative;
+}
+.toggle-chip input[type=checkbox]:checked {
+    background: var(--accent);
+    border-color: var(--accent);
+}
+.toggle-chip input[type=checkbox]:checked::after {
+    content: '';
+    position: absolute;
+    left: 3px; top: 0px;
+    width: 3px; height: 7px;
+    border: solid #061a0d;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+}
+.toggle-chip:has(input:checked) {
+    color: var(--text);
+    border-color: rgba(16, 185, 129, 0.5);
+    background: rgba(16, 185, 129, 0.08);
+}
+.toggle-chip-wbso input[type=checkbox]:checked {
+    background: var(--wbso);
+    border-color: var(--wbso);
+}
+.toggle-chip-wbso input[type=checkbox]:checked::after {
+    border-color: #06141a;
+}
+.toggle-chip-wbso:has(input:checked) {
+    border-color: rgba(56, 189, 248, 0.5);
+    background: rgba(56, 189, 248, 0.08);
+}
+
+/* Continuous-diff status badge */
+.auto-diff-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    margin-right: 4px;
+    min-height: 22px;
+    transition: background 150ms ease, color 150ms ease, border-color 150ms ease;
+}
+.auto-diff-badge[data-state="loading"] {
+    background: rgba(148, 163, 184, 0.12);
+    color: #cbd5e1;
+    border-color: rgba(148, 163, 184, 0.35);
+}
+.auto-diff-badge[data-state="clean"] {
+    background: rgba(56, 189, 248, 0.12);
+    color: #7dd3fc;
+    border-color: rgba(56, 189, 248, 0.35);
+}
+.auto-diff-badge[data-state="new"] {
+    background: rgba(16, 185, 129, 0.14);
+    color: #6ee7b7;
+    border-color: rgba(16, 185, 129, 0.4);
+}
+.auto-diff-badge[data-state="conflict"] {
+    background: rgba(239, 68, 68, 0.16);
+    color: #fca5a5;
+    border-color: rgba(239, 68, 68, 0.45);
+}
+.auto-diff-badge[data-state="error"] {
+    background: rgba(239, 68, 68, 0.1);
+    color: #fca5a5;
+    border-color: rgba(239, 68, 68, 0.3);
+}
+
+/* WBSO overlay bar inside day-card (Feature B) */
+.day-card .job-bar.wbso-overlay-bar {
+    background: rgba(56, 189, 248, 0.85);
+    color: #06141a;
+    font-weight: 800;
+    border: 1px solid rgba(14, 165, 233, 0.6);
+    margin-top: 2px;
+    letter-spacing: 0.02em;
+    text-shadow: none;
+    box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.25) inset;
+}
+.day-card.has-wbso-overlay { position: relative; }
+.day-card.has-wbso-overlay::after {
+    content: '';
+    position: absolute;
+    top: 4px; right: 4px;
+    width: 6px; height: 6px;
+    background: var(--wbso);
+    border-radius: 50%;
+    box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.25);
+}

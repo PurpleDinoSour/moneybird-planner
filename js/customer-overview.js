@@ -1,8 +1,9 @@
 // Moneybird Planner IV - Customer Overview Module
-// Version: 1.0.0
-// Financial overview: hours, revenue (excl/incl BTW) per job, with bar charts
+// Version: 1.1.0
+// Financial overview: hours, revenue (excl/incl BTW) per job, with bar charts.
+// All money math delegated to window.pricing (see js/pricing.js).
 
-var BTW_RATE = 0.21;
+var BTW_RATE = (window.pricing && window.pricing.BTW_RATE) || 0.21;
 
 // Calculate total working hours for a job in a given month
 function getJobMonthHours(job, year, month) {
@@ -22,15 +23,11 @@ function getJobMonthHours(job, year, month) {
 // Build overview data for all jobs for a given month
 function buildOverviewData(year, month) {
     var results = [];
-    var totalHours = 0;
-    var totalExcl = 0;
-    var totalIncl = 0;
 
     appState.jobs.forEach(function(job) {
         var hours = getJobMonthHours(job, year, month);
         var rate = job.hourlyRate || 0;
-        var excl = hours * rate;
-        var incl = excl * (1 + BTW_RATE);
+        var t = window.pricing.computeJobTotals({ hours: hours, rate: rate });
 
         results.push({
             id: job.id,
@@ -38,24 +35,25 @@ function buildOverviewData(year, month) {
             color: job.color,
             hours: hours,
             rate: rate,
-            excl: excl,
-            incl: incl
+            excl: t.excl,
+            incl: t.incl,
+            vat:  t.vat
         });
-
-        totalHours += hours;
-        totalExcl += excl;
-        totalIncl += incl;
     });
+
+    var totals = window.pricing.computeOverviewTotals(
+        results.map(function (r) { return { hours: r.hours, rate: r.rate }; })
+    );
 
     return {
         jobs: results,
-        totals: { hours: totalHours, excl: totalExcl, incl: totalIncl }
+        totals: { hours: totals.hours, excl: totals.excl, incl: totals.incl, vat: totals.vat }
     };
 }
 
-// Format currency (Dutch notation)
+// Format currency (Dutch notation) - delegated to pricing module
 function formatEur(amount) {
-    return '\u20AC ' + amount.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, '.').replace(/\.(\d{2})$/, ',$1');
+    return window.pricing.formatEur(amount);
 }
 
 // Render the customer overview panel
@@ -112,7 +110,7 @@ function renderCustomerOverview() {
     html += '</tr></thead><tbody>';
 
     sortedJobs.forEach(function(job) {
-        var share = data.totals.incl > 0 ? (job.incl / data.totals.incl) * 100 : 0;
+        var share = window.pricing.computeShare(job.incl, data.totals.incl);
         var dotColor = getExecutiveCustomerColor(job.color, 'dot');
         var shareBarColor = getExecutiveCustomerColor(job.color, 'bar');
         html += '<tr>';
