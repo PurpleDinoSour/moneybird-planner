@@ -2533,3 +2533,57 @@ body.wbso-mode .tab.active { background: var(--wbso); border-color: var(--wbso);
 .te-picker-project { padding: 4px 8px; }
 .te-picker-table tr.te-picker-mismatch td { opacity: 0.7; }
 .te-picker-table tr.te-picker-mismatch:hover td { opacity: 1; }
+/* Invoice details: linked time entries section + per-line action */
+.invoice-line-action { text-align: right; padding: 4px 8px; }
+.invoice-linked-section {
+    margin-top: 16px;
+    padding: 12px 14px;
+    background: rgba(59, 130, 246, 0.05);
+    border: 1px solid rgba(59, 130, 246, 0.18);
+    border-radius: 8px;
+}
+.invoice-linked-title {
+    margin: 0 0 8px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-secondary);
+}
+.invoice-linked-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+    margin-bottom: 10px;
+    font-size: 0.85rem;
+    color: var(--text);
+}
+.invoice-linked-empty,
+.invoice-linked-error {
+    margin: 0;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+.invoice-linked-error { color: var(--danger); }
+.invoice-linked-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+    font-family: var(--font-mono);
+}
+.invoice-linked-table th {
+    text-align: left;
+    padding: 6px 8px;
+    background: var(--surface);
+    color: var(--text-secondary);
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-bottom: 1px solid var(--border);
+}
+.invoice-linked-table td {
+    padding: 6px 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    color: var(--text);
+}

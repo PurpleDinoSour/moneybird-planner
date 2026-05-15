@@ -1062,7 +1062,7 @@ function renderConceptInvoicesList() {
         if (inv.details && inv.details.length > 0) {
             html += '<div class="invoice-lines-wrap">';
             html += '<table class="invoice-lines-table">';
-            html += '<thead><tr><th></th><th>Description</th><th>Qty</th><th>Rate</th><th>Period</th><th>Links</th></tr></thead><tbody>';
+            html += '<thead><tr><th></th><th>Description</th><th>Qty</th><th>Rate</th><th>Period</th><th>Links</th><th></th></tr></thead><tbody>';
             inv.details.forEach(function(detail, dIdx) {
                 var desc = detail.description || 'No description';
                 var qty = detail.amount || '';
@@ -1078,12 +1078,18 @@ function renderConceptInvoicesList() {
                 html += '<td class="invoice-line-num">EUR ' + escapeHtml(price) + '</td>';
                 html += '<td class="invoice-line-period">' + escapeHtml(period || '-') + '</td>';
                 html += '<td class="invoice-line-links">' + (hasTimeEntries ? teCount + ' linked' : '-') + '</td>';
+                html += '<td class="invoice-line-action"><button type="button" class="btn btn-sm btn-secondary" onclick="billLineFromTimeEntries(' + idx + ', ' + dIdx + ')" title="Attach all time entries linked to this invoice to THIS line so Moneybird recomputes qty + rate">Bill from linked hours</button></td>';
                 html += '</tr>';
             });
             html += '</tbody></table></div>';
         } else {
             html += '<p class="invoice-no-lines">No detail lines</p>';
         }
+        // Linked time entries section (lazy-loaded on expand)
+        html += '<div class="invoice-linked-section" id="invoiceLinked' + idx + '">';
+        html += '<h5 class="invoice-linked-title">Linked time entries</h5>';
+        html += '<div class="invoice-linked-body" data-loaded="0">Open to load...</div>';
+        html += '</div>';
         html += '</div>';
         html += '</article>';
     });
@@ -1098,9 +1104,151 @@ function toggleInvoiceDetails(idx) {
     if (details.hidden) {
         details.hidden = false;
         chevron.classList.add('is-open');
+        // Lazy-load linked time entries the first time this invoice is expanded.
+        var section = document.getElementById('invoiceLinked' + idx);
+        if (section) {
+            var body = section.querySelector('.invoice-linked-body');
+            if (body && body.dataset.loaded !== '1') {
+                loadInvoiceLinkedEntries(idx).catch(function(e) { console.error(e); });
+            }
+        }
     } else {
         details.hidden = true;
         chevron.classList.remove('is-open');
+    }
+}
+
+// Fetch all time entries currently linked to this concept invoice and render them
+// under the invoice details panel. Caches result on appState.
+async function loadInvoiceLinkedEntries(idx) {
+    var inv = appState.conceptInvoices[idx];
+    if (!inv) return;
+    var section = document.getElementById('invoiceLinked' + idx);
+    if (!section) return;
+    var body = section.querySelector('.invoice-linked-body');
+    body.innerHTML = 'Loading...';
+    var config = getCurrentConfig();
+    try {
+        var resp = await fetch(CONFIG.API_BASE_URL + '/moneybird/' + config.adminId + '/time_entries?filter=sales_invoice_id:' + inv.id + '&per_page=100', {
+            headers: { 'X-Moneybird-Token': config.token }
+        });
+        if (!resp.ok) throw new Error('API ' + resp.status);
+        var entries = await resp.json();
+        // Cache so billLineFromTimeEntries can grab the ids without refetching.
+        inv.__linkedEntries = entries;
+        body.dataset.loaded = '1';
+        if (!entries || entries.length === 0) {
+            body.innerHTML = '<p class="invoice-linked-empty">No time entries are linked to this invoice yet. Use <strong>+ Add Hours</strong> above.</p>';
+            return;
+        }
+        var jobs = (window.appState && Array.isArray(appState.jobs)) ? appState.jobs : [];
+        // Group by project for a quick at-a-glance summary.
+        var byProject = {};
+        var totalH = 0;
+        entries.forEach(function(e) {
+            var pid = e.project_id || (e.project && e.project.id) || '_none';
+            var pidStr = String(pid);
+            var matchJob = jobs.find(function(j) { return String(j.projectId || '') === pidStr; });
+            var name = matchJob ? matchJob.name : ((e.project && e.project.name) || 'No project');
+            var color = matchJob ? matchJob.color : null;
+            var hours = 0;
+            if (e.started_at && e.ended_at) {
+                hours = (new Date(e.ended_at) - new Date(e.started_at)) / 3600000;
+                if (e.paused_duration) hours -= e.paused_duration / 3600;
+            }
+            totalH += hours;
+            if (!byProject[pidStr]) byProject[pidStr] = { name: name, color: color, count: 0, hours: 0 };
+            byProject[pidStr].count++;
+            byProject[pidStr].hours += hours;
+        });
+        var summary = '<div class="invoice-linked-summary">';
+        summary += '<strong>' + entries.length + ' time entr' + (entries.length === 1 ? 'y' : 'ies') + '</strong> &middot; ' + totalH.toFixed(1) + 'h total';
+        Object.keys(byProject).forEach(function(k) {
+            var p = byProject[k];
+            var style = p.color ? ' style="background:' + p.color + ';"' : '';
+            var cls = 'hour-entry-pill' + (p.color ? '' : ' hour-entry-pill-unknown');
+            summary += ' <span class="' + cls + '"' + style + '>' + escapeHtml(p.name) + ' ' + p.count + ' / ' + p.hours.toFixed(1) + 'h</span>';
+        });
+        summary += '</div>';
+        // Sorted entry list, newest first.
+        var sorted = entries.slice().sort(function(a, b) {
+            var da = (a.started_at || '').substring(0, 10);
+            var db = (b.started_at || '').substring(0, 10);
+            if (da !== db) return da < db ? 1 : -1;
+            return 0;
+        });
+        var rows = '<table class="invoice-linked-table"><thead><tr><th>Date</th><th>Hours</th><th>Project</th><th>Description</th></tr></thead><tbody>';
+        sorted.forEach(function(e) {
+            var date = (e.started_at || '').substring(0, 10);
+            var pid = e.project_id || (e.project && e.project.id) || '';
+            var matchJob = jobs.find(function(j) { return String(j.projectId || '') === String(pid); });
+            var name = matchJob ? matchJob.name : ((e.project && e.project.name) || 'No project');
+            var color = matchJob ? matchJob.color : null;
+            var hours = 0;
+            if (e.started_at && e.ended_at) {
+                hours = (new Date(e.ended_at) - new Date(e.started_at)) / 3600000;
+                if (e.paused_duration) hours -= e.paused_duration / 3600;
+            }
+            var pillStyle = color ? ' style="background:' + color + ';"' : '';
+            var pillCls = 'hour-entry-pill' + (color ? '' : ' hour-entry-pill-unknown');
+            rows += '<tr>';
+            rows += '<td>' + escapeHtml(date) + '</td>';
+            rows += '<td>' + hours.toFixed(1) + 'h</td>';
+            rows += '<td><span class="' + pillCls + '"' + pillStyle + '>' + escapeHtml(name) + '</span></td>';
+            rows += '<td>' + escapeHtml(e.description || '-') + '</td>';
+            rows += '</tr>';
+        });
+        rows += '</tbody></table>';
+        body.innerHTML = summary + rows;
+    } catch (err) {
+        body.innerHTML = '<p class="invoice-linked-error">Error loading linked entries: ' + escapeHtml(err.message) + '</p>';
+    }
+}
+
+// Attach all time entries currently linked to the invoice to a specific detail line
+// so Moneybird recomputes qty + rate from the entries instead of the manual values.
+async function billLineFromTimeEntries(invIdx, dIdx) {
+    var config = getCurrentConfig();
+    var inv = appState.conceptInvoices[invIdx];
+    if (!inv || !inv.details || !inv.details[dIdx]) return;
+    var detail = inv.details[dIdx];
+    var linked = inv.__linkedEntries;
+    if (!linked) {
+        // Make sure we have them.
+        await loadInvoiceLinkedEntries(invIdx);
+        linked = inv.__linkedEntries;
+    }
+    if (!linked || linked.length === 0) {
+        alert('No time entries are linked to this invoice yet. Use + Add Hours first.');
+        return;
+    }
+    var ids = linked.map(function(e) { return String(e.id); });
+    var totalH = 0;
+    linked.forEach(function(e) {
+        if (e.started_at && e.ended_at) {
+            var h = (new Date(e.ended_at) - new Date(e.started_at)) / 3600000;
+            if (e.paused_duration) h -= e.paused_duration / 3600;
+            totalH += h;
+        }
+    });
+    var msg = 'Bill ' + ids.length + ' linked time entries (' + totalH.toFixed(1) + 'h) on the line:\n\n'
+        + '"' + (detail.description || '-') + '"\n\n'
+        + 'Moneybird will replace the line\'s qty + rate with values derived from the linked time entries (qty = sum of hours, rate = project hourly rate). Continue?';
+    if (!confirm(msg)) return;
+    try {
+        var resp = await fetch(CONFIG.API_BASE_URL + '/moneybird/' + config.adminId + '/sales_invoices/' + inv.id, {
+            method: 'PATCH',
+            headers: { 'X-Moneybird-Token': config.token, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sales_invoice: { details_attributes: [ { id: detail.id, time_entry_ids: ids } ] } })
+        });
+        if (!resp.ok) {
+            var errText = await resp.text();
+            throw new Error('API ' + resp.status + ': ' + errText);
+        }
+        // Refresh the invoices list so qty + rate update.
+        await fetchConceptInvoices();
+    } catch (err) {
+        alert('Could not update the invoice line: ' + err.message);
     }
 }
 
@@ -1233,6 +1381,7 @@ async function linkHoursToInvoice(invIdx) {
 
         var msg = 'Linked ' + success + ' time entr' + (success === 1 ? 'y' : 'ies') + ' to invoice';
         if (failed > 0) msg += ', ' + failed + ' failed';
+        msg += '.\n\nThe link is set on the time entries, but the invoice line still shows its original qty/rate. Expand the invoice and click "Bill from linked hours" on the line to roll the hours into the total.';
         alert(msg);
         fetchConceptInvoices();
     } catch (err) {
