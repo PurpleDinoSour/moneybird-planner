@@ -59,7 +59,7 @@
                  {
                      "id":  "job_1778867041675",
                      "name":  "RIVM",
-                     "color":  "#1D4ED8",
+                     "color":  "#06B6D4",
                      "projectId":  "478308704970605831",
                      "projectName":  "Rijksinstituut voor Volksgezondheid en Milieu (RIVM)",
                      "description":  "Consultancy uren",
@@ -82,5 +82,5 @@
                                        }
                  }
              ],
-    "lastModified":  "2026-05-15T19:24:40.409Z"
+    "lastModified":  "2026-05-15T19:24:54.364Z"
 }
