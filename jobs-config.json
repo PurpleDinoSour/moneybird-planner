@@ -60,9 +60,10 @@
                                             }
                                   },
                      "dateOverrides":  {
-                                           "2026-05-05":  false
+                                           "2026-05-05":  false,
+                                           "2026-05-06":  true
                                        }
                  }
              ],
-    "lastModified":  "2026-05-15T17:53:23.580Z"
+    "lastModified":  "2026-05-15T17:53:25.558Z"
 }
