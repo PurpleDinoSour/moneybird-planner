@@ -115,6 +115,7 @@
                     <input type="month" id="monthPicker" onchange="renderCalendar()">
                     <button class="btn btn-secondary" onclick="fetchExistingHours()">📥 Manage Hours</button>
                     <button class="btn btn-ghost" onclick="fetchOpenHours()" style="background:#fef2f2; color:#dc2626; border:1px solid #fecaca; font-size:0.8rem;">🧹 Open Hours</button>
+                    <button class="btn btn-ghost" onclick="fetchConceptInvoices()" style="background:#fff7ed; color:#c2410c; border:1px solid #fed7aa; font-size:0.8rem;">📄 Concept Invoices</button>
                 </div>
 
                 <!-- Month Title -->
@@ -130,6 +131,7 @@
                     <div class="calendar-header">Thu</div>
                     <div class="calendar-header">Fri</div>
                     <div class="calendar-header">Sat</div>
+                    <div class="calendar-header">Total</div>
                 </div>
                 <div class="calendar-grid" id="calendarGrid"></div>
                 <div id="monthSummary"></div>
@@ -197,6 +199,18 @@
                     <button class="btn btn-sm btn-danger" onclick="deleteSelectedHours()">🗑️ Delete</button>
                 </div>
                 <div class="hours-list" id="hoursList"></div>
+            </div>
+
+            <!-- Concept Invoices Management (hidden by default) -->
+            <div class="card" id="conceptInvoicesSection" style="display:none;">
+                <div class="card-header">
+                    <div>
+                        <h3 class="card-title">📄 Concept Invoices</h3>
+                        <p class="card-subtitle" id="conceptInvoiceCount">0 invoices loaded</p>
+                    </div>
+                    <button class="btn btn-ghost" onclick="document.getElementById('conceptInvoicesSection').style.display='none';" style="background:#e5e7eb; color:#374151;">✕ Close</button>
+                </div>
+                <div id="conceptInvoicesList"></div>
             </div>
         </div>
 

@@ -508,35 +508,8 @@ async function deleteSelectedHours() {
                 success++;
             } else {
                 const errBody = await response.json().catch(function() { return {}; });
-                if (errBody.symbolic && errBody.symbolic.id === 'cannot_destroy') {
-                    // Try to unlink from invoice first, then retry delete
-                    try {
-                        const unlinkResp = await fetch(`${CONFIG.API_BASE_URL}/moneybird/${config.adminId}/time_entries/${entry.id}`, {
-                            method: 'PATCH',
-                            headers: {
-                                'X-Moneybird-Token': config.token,
-                                'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify({ time_entry: { sales_invoice_id: '' } })
-                        });
-                        if (unlinkResp.ok) {
-                            // Retry delete after unlinking
-                            const retryResp = await fetch(`${CONFIG.API_BASE_URL}/moneybird/${config.adminId}/time_entries/${entry.id}`, {
-                                method: 'DELETE',
-                                headers: { 'X-Moneybird-Token': config.token }
-                            });
-                            if (retryResp.ok || retryResp.status === 204) {
-                                success++;
-                            } else {
-                                invoiceLocked++;
-                            }
-                        } else {
-                            invoiceLocked++;
-                        }
-                    } catch (unlinkErr) {
-                        console.error('Unlink failed:', unlinkErr);
-                        invoiceLocked++;
-                    }
+                if (errBody.symbolic && (errBody.symbolic.id === 'cannot_destroy' || errBody.symbolic.id === 'forbidden')) {
+                    invoiceLocked++;
                 } else {
                     failed++;
                 }
@@ -549,7 +522,7 @@ async function deleteSelectedHours() {
 
     let msg = '';
     if (success > 0) msg += `Deleted ${success} entries. `;
-    if (invoiceLocked > 0) msg += `${invoiceLocked} entries are linked to an invoice and cannot be deleted — remove or delete the invoice in Moneybird first. `;
+    if (invoiceLocked > 0) msg += `${invoiceLocked} entries are linked to an invoice — use the Concept Invoices button to detach them first. `;
     if (failed > 0) msg += `${failed} failed for other reasons.`;
     alert(msg.trim());
     fetchExistingHours();
@@ -955,4 +928,426 @@ function selectQuickProject(projectId, type) {
             btn.classList.add('active');
         }
     });
+}
+
+// --- CONCEPT INVOICES ---
+async function fetchConceptInvoices() {
+    var config = getCurrentConfig();
+    if (!config.token || !config.adminId) {
+        alert('Please configure API settings first');
+        return;
+    }
+
+    var section = document.getElementById('conceptInvoicesSection');
+    section.style.display = 'block';
+    var list = document.getElementById('conceptInvoicesList');
+    list.innerHTML = '<p style="padding:20px; text-align:center;">Loading concept invoices...</p>';
+
+    try {
+        var allInvoices = [];
+        var page = 1;
+        var hasMore = true;
+        while (hasMore) {
+            var response = await fetch(CONFIG.API_BASE_URL + '/moneybird/' + config.adminId + '/sales_invoices?filter=state:draft&per_page=100&page=' + page, {
+                headers: { 'X-Moneybird-Token': config.token }
+            });
+            if (!response.ok) throw new Error('API error: ' + response.status);
+            var pageInvoices = await response.json();
+            allInvoices = allInvoices.concat(pageInvoices);
+            hasMore = pageInvoices.length === 100;
+            page++;
+        }
+
+        // List endpoint omits time_entry_ids — fetch each invoice individually for full details
+        list.innerHTML = '<p style="padding:20px; text-align:center;">Loading details for ' + allInvoices.length + ' invoice(s)...</p>';
+        var fullInvoices = [];
+        for (var i = 0; i < allInvoices.length; i++) {
+            try {
+                var detailResp = await fetch(CONFIG.API_BASE_URL + '/moneybird/' + config.adminId + '/sales_invoices/' + allInvoices[i].id, {
+                    headers: { 'X-Moneybird-Token': config.token }
+                });
+                if (detailResp.ok) {
+                    fullInvoices.push(await detailResp.json());
+                } else {
+                    fullInvoices.push(allInvoices[i]);
+                }
+            } catch (e) {
+                fullInvoices.push(allInvoices[i]);
+            }
+        }
+
+        appState.conceptInvoices = fullInvoices;
+        renderConceptInvoicesList();
+    } catch (err) {
+        list.innerHTML = '<p style="padding:20px; text-align:center; color:var(--danger);">Error: ' + escapeHtml(err.message) + '</p>';
+    }
+}
+
+function renderConceptInvoicesList() {
+    var list = document.getElementById('conceptInvoicesList');
+    var invoices = appState.conceptInvoices || [];
+
+    document.getElementById('conceptInvoiceCount').textContent = invoices.length + ' concept invoice' + (invoices.length !== 1 ? 's' : '');
+
+    if (invoices.length === 0) {
+        list.innerHTML = '<p style="padding:20px; text-align:center; color:var(--success,#22c55e);">No concept invoices found</p>';
+        return;
+    }
+
+    var html = '';
+    invoices.forEach(function(inv, idx) {
+        var contactName = (inv.contact && inv.contact.company_name) ? inv.contact.company_name : (inv.contact ? inv.contact.firstname + ' ' + inv.contact.lastname : 'Unknown');
+        var totalPrice = inv.total_price_incl_tax_base ? parseFloat(inv.total_price_incl_tax_base).toFixed(2) : '0.00';
+        var detailCount = inv.details ? inv.details.length : 0;
+        var timeEntryCount = 0;
+        if (inv.details) {
+            inv.details.forEach(function(d) {
+                if (d.time_entry_ids && d.time_entry_ids.length > 0) {
+                    timeEntryCount += d.time_entry_ids.length;
+                }
+            });
+        }
+        var invoiceDate = inv.invoice_date || inv.created_at || '';
+        if (invoiceDate && invoiceDate.length > 10) invoiceDate = invoiceDate.substring(0, 10);
+
+        html += '<div style="border:1px solid var(--border,#e5e7eb);border-radius:8px;margin-bottom:8px;overflow:hidden;">';
+        html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--card-bg,#f8f9fa);cursor:pointer;" onclick="toggleInvoiceDetails(' + idx + ')">';
+        html += '<div>';
+        html += '<div style="font-weight:600;font-size:0.9rem;">' + escapeHtml(contactName) + '</div>';
+        html += '<div style="font-size:0.78rem;color:var(--muted);">';
+        html += (inv.invoice_id ? '#' + inv.invoice_id : 'Draft') + ' &middot; ' + invoiceDate + ' &middot; ' + detailCount + ' line(s)';
+        if (timeEntryCount > 0) html += ' &middot; ' + timeEntryCount + ' time entries';
+        html += '</div>';
+        html += '</div>';
+        html += '<div style="display:flex;align-items:center;gap:8px;">';
+        html += '<span style="font-weight:700;font-size:0.9rem;">&euro;' + escapeHtml(totalPrice) + '</span>';
+        html += '<span style="font-size:1.2rem;color:var(--muted);transition:transform 0.2s;" id="invoiceChevron' + idx + '">&#9660;</span>';
+        html += '</div>';
+        html += '</div>';
+
+        // Detail lines (collapsed by default)
+        html += '<div id="invoiceDetails' + idx + '" style="display:none;padding:0 14px 10px;">';
+        html += '<div style="margin:8px 0 6px;display:flex;gap:8px;flex-wrap:wrap;">';
+        html += '<button class="btn btn-sm btn-ghost" onclick="linkHoursToInvoice(' + idx + ')" style="background:#dbeafe;color:#1d4ed8;border:1px solid #93c5fd;">+ Add Hours</button>';
+        if (inv.details && inv.details.length > 0) {
+            html += '<button class="btn btn-sm btn-ghost" onclick="selectAllInvoiceLines(' + idx + ')" style="background:#d1fae5;color:#059669;">Select All</button>';
+            html += '<button class="btn btn-sm btn-ghost" onclick="deselectAllInvoiceLines(' + idx + ')" style="background:#e5e7eb;color:#374151;">Deselect All</button>';
+            html += '<button class="btn btn-sm btn-ghost" onclick="detachSelectedLines(' + idx + ')" style="background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;">Detach Selected</button>';
+        }
+        html += '<button class="btn btn-sm btn-danger" onclick="deleteConceptInvoice(' + idx + ')">Delete Invoice</button>';
+        html += '</div>';
+        if (inv.details && inv.details.length > 0) {
+
+            inv.details.forEach(function(detail, dIdx) {
+                var desc = detail.description || 'No description';
+                var qty = detail.amount || '';
+                var price = detail.price ? parseFloat(detail.price).toFixed(2) : '0.00';
+                var period = detail.period || '';
+                var hasTimeEntries = detail.time_entry_ids && detail.time_entry_ids.length > 0;
+                var teCount = hasTimeEntries ? detail.time_entry_ids.length : 0;
+
+                html += '<div style="display:flex;align-items:flex-start;gap:8px;padding:6px 0;border-bottom:1px solid #f3f4f6;">';
+                html += '<input type="checkbox" data-inv="' + idx + '" data-detail="' + dIdx + '" class="inv-line-cb" style="margin-top:3px;">';
+                html += '<div style="flex:1;min-width:0;">';
+                html += '<div style="font-size:0.82rem;font-weight:500;">' + escapeHtml(desc) + '</div>';
+                html += '<div style="font-size:0.75rem;color:var(--muted);">';
+                html += qty + ' x &euro;' + escapeHtml(price);
+                if (period) html += ' &middot; ' + escapeHtml(period);
+                if (hasTimeEntries) html += ' &middot; <span style="color:#c2410c;">' + teCount + ' time entr' + (teCount === 1 ? 'y' : 'ies') + ' linked</span>';
+                html += '</div>';
+                html += '</div>';
+                html += '</div>';
+            });
+        } else {
+            html += '<p style="padding:8px 0;font-size:0.85rem;color:var(--muted);">No detail lines</p>';
+        }
+        html += '</div>';
+        html += '</div>';
+    });
+
+    list.innerHTML = html;
+}
+
+function toggleInvoiceDetails(idx) {
+    var details = document.getElementById('invoiceDetails' + idx);
+    var chevron = document.getElementById('invoiceChevron' + idx);
+    if (details.style.display === 'none') {
+        details.style.display = 'block';
+        chevron.style.transform = 'rotate(180deg)';
+    } else {
+        details.style.display = 'none';
+        chevron.style.transform = '';
+    }
+}
+
+async function linkHoursToInvoice(invIdx) {
+    var config = getCurrentConfig();
+    var invoice = appState.conceptInvoices[invIdx];
+    if (!invoice) return;
+
+    var contactId = invoice.contact_id || (invoice.contact && invoice.contact.id) || null;
+    var contactName = (invoice.contact && invoice.contact.company_name) ? invoice.contact.company_name : 'this contact';
+
+    // Fetch open (non-invoiced) time entries
+    try {
+        var allEntries = [];
+        var page = 1;
+        var hasMore = true;
+        while (hasMore) {
+            var resp = await fetch(CONFIG.API_BASE_URL + '/moneybird/' + config.adminId + '/time_entries?filter=state:open&per_page=100&page=' + page, {
+                headers: { 'X-Moneybird-Token': config.token }
+            });
+            if (!resp.ok) throw new Error('API error: ' + resp.status);
+            var pageEntries = await resp.json();
+            allEntries = allEntries.concat(pageEntries);
+            hasMore = pageEntries.length === 100;
+            page++;
+        }
+
+        // Filter to entries matching the invoice's contact
+        var matchingEntries = contactId ? allEntries.filter(function(e) { return e.contact_id === contactId; }) : allEntries;
+        var otherEntries = contactId ? allEntries.filter(function(e) { return e.contact_id !== contactId; }) : [];
+
+        if (allEntries.length === 0) {
+            alert('No open (non-invoiced) time entries found.');
+            return;
+        }
+
+        // Build picker items
+        var items = [];
+        matchingEntries.forEach(function(e) {
+            var date = e.started_at ? e.started_at.substring(0, 10) : '';
+            var hours = 0;
+            if (e.started_at && e.ended_at) {
+                hours = (new Date(e.ended_at) - new Date(e.started_at)) / 3600000;
+                if (e.paused_duration) hours -= e.paused_duration / 3600;
+            }
+            items.push({ id: e.id, date: date, hours: hours, desc: e.description || '', contact: contactName, match: true });
+        });
+        otherEntries.forEach(function(e) {
+            var date = e.started_at ? e.started_at.substring(0, 10) : '';
+            var hours = 0;
+            if (e.started_at && e.ended_at) {
+                hours = (new Date(e.ended_at) - new Date(e.started_at)) / 3600000;
+                if (e.paused_duration) hours -= e.paused_duration / 3600;
+            }
+            var cName = (e.contact && e.contact.company_name) ? e.contact.company_name : 'Unknown';
+            items.push({ id: e.id, date: date, hours: hours, desc: e.description || '', contact: cName, match: false });
+        });
+
+        // Show picker modal
+        var selected = await showTimeEntryPicker('Add hours to ' + contactName, items);
+        if (!selected || selected.length === 0) return;
+
+        // Link each selected time entry to this invoice
+        var success = 0;
+        var failed = 0;
+        for (var i = 0; i < selected.length; i++) {
+            try {
+                var linkResp = await fetch(CONFIG.API_BASE_URL + '/moneybird/' + config.adminId + '/time_entries/' + selected[i], {
+                    method: 'PATCH',
+                    headers: {
+                        'X-Moneybird-Token': config.token,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ time_entry: { sales_invoice_id: String(invoice.id) } })
+                });
+                if (linkResp.ok) {
+                    success++;
+                } else {
+                    failed++;
+                    var errText = await linkResp.text();
+                    console.error('Link failed for ' + selected[i] + ':', errText);
+                }
+            } catch (err) {
+                failed++;
+                console.error('Link error for ' + selected[i] + ':', err);
+            }
+        }
+
+        var msg = 'Linked ' + success + ' time entr' + (success === 1 ? 'y' : 'ies') + ' to invoice';
+        if (failed > 0) msg += ', ' + failed + ' failed';
+        alert(msg);
+        fetchConceptInvoices();
+    } catch (err) {
+        alert('Error fetching time entries: ' + err.message);
+    }
+}
+
+function showTimeEntryPicker(title, items) {
+    return new Promise(function(resolve) {
+        var overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:2000;display:flex;align-items:center;justify-content:center;';
+
+        var modal = document.createElement('div');
+        modal.style.cssText = 'background:var(--card,#fff);border:1px solid var(--border,#e5e7eb);border-radius:12px;padding:24px;min-width:400px;max-width:600px;max-height:80vh;display:flex;flex-direction:column;';
+
+        var heading = document.createElement('h3');
+        heading.textContent = title;
+        heading.style.cssText = 'margin:0 0 12px;font-size:1rem;';
+        modal.appendChild(heading);
+
+        var selectBar = document.createElement('div');
+        selectBar.style.cssText = 'display:flex;gap:8px;margin-bottom:12px;';
+        var selAllBtn = document.createElement('button');
+        selAllBtn.textContent = 'Select All';
+        selAllBtn.className = 'btn btn-sm btn-ghost';
+        selAllBtn.style.cssText = 'background:#d1fae5;color:#059669;';
+        selAllBtn.onclick = function() { modal.querySelectorAll('.te-pick-cb').forEach(function(cb) { cb.checked = true; }); };
+        var desAllBtn = document.createElement('button');
+        desAllBtn.textContent = 'Deselect All';
+        desAllBtn.className = 'btn btn-sm btn-ghost';
+        desAllBtn.style.cssText = 'background:#e5e7eb;color:#374151;';
+        desAllBtn.onclick = function() { modal.querySelectorAll('.te-pick-cb').forEach(function(cb) { cb.checked = false; }); };
+        selectBar.appendChild(selAllBtn);
+        selectBar.appendChild(desAllBtn);
+        modal.appendChild(selectBar);
+
+        var list = document.createElement('div');
+        list.style.cssText = 'overflow-y:auto;flex:1;margin-bottom:16px;border:1px solid var(--border,#e5e7eb);border-radius:8px;';
+
+        if (items.length === 0) {
+            list.innerHTML = '<p style="padding:20px;text-align:center;color:var(--muted);">No open time entries found</p>';
+        } else {
+            var html = '';
+            items.forEach(function(item) {
+                var bg = item.match ? '' : 'background:var(--surface,#f9fafb);';
+                html += '<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid #f3f4f6;' + bg + '">';
+                html += '<input type="checkbox" class="te-pick-cb" data-id="' + item.id + '"' + (item.match ? ' checked' : '') + '>';
+                html += '<div style="flex:1;min-width:0;">';
+                html += '<div style="font-size:0.85rem;font-weight:500;">' + escapeHtml(item.date) + ' &middot; ' + item.hours.toFixed(1) + 'h</div>';
+                html += '<div style="font-size:0.75rem;color:var(--muted);">' + escapeHtml(item.desc) + '</div>';
+                if (!item.match) {
+                    html += '<div style="font-size:0.7rem;color:#c2410c;">Contact: ' + escapeHtml(item.contact) + '</div>';
+                }
+                html += '</div></div>';
+            });
+            list.innerHTML = html;
+        }
+        modal.appendChild(list);
+
+        var btnRow = document.createElement('div');
+        btnRow.style.cssText = 'display:flex;gap:8px;justify-content:flex-end;';
+        var cancelBtn = document.createElement('button');
+        cancelBtn.textContent = 'Cancel';
+        cancelBtn.className = 'btn btn-ghost';
+        cancelBtn.style.cssText = 'background:#e5e7eb;color:#374151;';
+        cancelBtn.onclick = function() { document.body.removeChild(overlay); resolve(null); };
+        var addBtn = document.createElement('button');
+        addBtn.textContent = 'Add Selected';
+        addBtn.className = 'btn btn-primary';
+        addBtn.onclick = function() {
+            var ids = [];
+            modal.querySelectorAll('.te-pick-cb:checked').forEach(function(cb) { ids.push(cb.dataset.id); });
+            document.body.removeChild(overlay);
+            resolve(ids);
+        };
+        btnRow.appendChild(cancelBtn);
+        btnRow.appendChild(addBtn);
+        modal.appendChild(btnRow);
+
+        overlay.appendChild(modal);
+        overlay.onclick = function(e) { if (e.target === overlay) { document.body.removeChild(overlay); resolve(null); } };
+        document.body.appendChild(overlay);
+    });
+}
+
+function selectAllInvoiceLines(invIdx) {
+    document.querySelectorAll('.inv-line-cb[data-inv="' + invIdx + '"]').forEach(function(cb) {
+        if (!cb.disabled) cb.checked = true;
+    });
+}
+
+function deselectAllInvoiceLines(invIdx) {
+    document.querySelectorAll('.inv-line-cb[data-inv="' + invIdx + '"]').forEach(function(cb) {
+        cb.checked = false;
+    });
+}
+
+async function detachSelectedLines(invIdx) {
+    var config = getCurrentConfig();
+    var invoice = appState.conceptInvoices[invIdx];
+    if (!invoice || !invoice.details) return;
+
+    var selectedCbs = document.querySelectorAll('.inv-line-cb[data-inv="' + invIdx + '"]:checked');
+    if (selectedCbs.length === 0) {
+        alert('No lines selected');
+        return;
+    }
+
+    // Collect detail IDs to destroy from the invoice
+    var detailsToDestroy = [];
+    var totalTimeEntries = 0;
+    selectedCbs.forEach(function(cb) {
+        var dIdx = parseInt(cb.dataset.detail);
+        var detail = invoice.details[dIdx];
+        if (detail && detail.id) {
+            detailsToDestroy.push(detail.id);
+            if (detail.time_entry_ids) totalTimeEntries += detail.time_entry_ids.length;
+        }
+    });
+
+    if (detailsToDestroy.length === 0) {
+        alert('No lines to detach');
+        return;
+    }
+
+    var msg = 'Remove ' + detailsToDestroy.length + ' line(s) from this invoice?';
+    if (totalTimeEntries > 0) msg += '\n\n' + totalTimeEntries + ' time entr' + (totalTimeEntries === 1 ? 'y' : 'ies') + ' will become open (unlinked) again.';
+    if (!confirm(msg)) return;
+
+    // PATCH the invoice: destroy selected detail lines
+    var detailsAttributes = detailsToDestroy.map(function(detailId) {
+        return { id: detailId, _destroy: true };
+    });
+
+    try {
+        var resp = await fetch(CONFIG.API_BASE_URL + '/moneybird/' + config.adminId + '/sales_invoices/' + invoice.id, {
+            method: 'PATCH',
+            headers: {
+                'X-Moneybird-Token': config.token,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ sales_invoice: { details_attributes: detailsAttributes } })
+        });
+        if (resp.ok) {
+            alert('Removed ' + detailsToDestroy.length + ' line(s) from invoice. Time entries are now open.');
+        } else {
+            var errBody = await resp.text();
+            alert('Failed to update invoice: ' + resp.status + '\n' + errBody);
+        }
+    } catch (err) {
+        alert('Error updating invoice: ' + err.message);
+    }
+
+    // Refresh the invoices list
+    fetchConceptInvoices();
+}
+
+async function deleteConceptInvoice(invIdx) {
+    var config = getCurrentConfig();
+    var invoice = appState.conceptInvoices[invIdx];
+    if (!invoice) return;
+
+    var contactName = (invoice.contact && invoice.contact.company_name) ? invoice.contact.company_name : 'Unknown';
+    if (!confirm('Delete concept invoice for ' + contactName + '?\n\nThis will unlink all time entries and delete the invoice. The time entries will become open again.')) {
+        return;
+    }
+
+    try {
+        var resp = await fetch(CONFIG.API_BASE_URL + '/moneybird/' + config.adminId + '/sales_invoices/' + invoice.id, {
+            method: 'DELETE',
+            headers: { 'X-Moneybird-Token': config.token }
+        });
+
+        if (resp.ok || resp.status === 204) {
+            alert('Invoice deleted. Time entries are now open.');
+            fetchConceptInvoices();
+        } else {
+            var errText = await resp.text();
+            alert('Failed to delete invoice: ' + resp.status + '\n' + errText);
+        }
+    } catch (err) {
+        alert('Error deleting invoice: ' + err.message);
+    }
 }

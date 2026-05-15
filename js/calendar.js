@@ -86,6 +86,32 @@ function renderCalendar(forceRecompute) {
         grid.appendChild(empty);
     }
 
+    // Track per-week hours for the total column
+    var weekJobHours = {};
+    appState.jobs.forEach(function(job) { weekJobHours[job.id] = 0; });
+
+    // Helper to build and append the week total cell
+    function appendWeekTotal() {
+        var totalCell = document.createElement('div');
+        totalCell.className = 'week-total';
+        if (appState.currentHourType !== 'wbso' && appState.jobs.length > 0) {
+            var grandTotal = 0;
+            appState.jobs.forEach(function(job) { grandTotal += weekJobHours[job.id]; });
+            var html = '<span class="wt-grand">' + grandTotal + 'h</span>';
+            if (appState.jobs.length > 1) {
+                appState.jobs.forEach(function(job) {
+                    if (weekJobHours[job.id] > 0) {
+                        html += '<span class="wt-job" style="background:' + job.color + ';">' + escapeHtml(job.name) + ' ' + weekJobHours[job.id] + '</span>';
+                    }
+                });
+            }
+            totalCell.innerHTML = html;
+        }
+        grid.appendChild(totalCell);
+        // Reset counters
+        appState.jobs.forEach(function(job) { weekJobHours[job.id] = 0; });
+    }
+
     for (let d = 1; d <= daysInMonth; d++) {
         const dateObj = new Date(Date.UTC(year, month - 1, d));
         const dateStr = dateObj.toISOString().split('T')[0];
@@ -106,6 +132,15 @@ function renderCalendar(forceRecompute) {
 
         if (isActive) appState.selectedDates.add(dateStr);
 
+        // Accumulate hours for week total column
+        if (appState.currentHourType !== 'wbso') {
+            var jobsOnDayForTotal = getJobsForDate(dateStr);
+            jobsOnDayForTotal.forEach(function(job) {
+                var sched = getScheduleForJobDate(job, dateStr);
+                weekJobHours[job.id] += calculateJobHours(sched);
+            });
+        }
+
         const card = document.createElement('div');
         const jobsOnDay = getJobsForDate(dateStr);
         card.className = `day-card ${isActive ? 'active' : ''} ${isHoliday ? 'holiday' : ''}`;
@@ -116,13 +151,16 @@ function renderCalendar(forceRecompute) {
         // Build card content
         let cardHTML = `<span class="day-number">${d}</span><span class="day-name">${DAY_NAMES[dayOfWeek]}</span>`;
 
-        // Job color bars + holiday bar at bottom
+        // Job color bars + holiday bar at bottom (show hours per customer)
         var hasBars = (jobsOnDay.length > 0 && appState.currentHourType !== 'wbso') || isHoliday;
         if (hasBars) {
             cardHTML += '<div class="job-bars">';
             if (jobsOnDay.length > 0 && appState.currentHourType !== 'wbso') {
                 jobsOnDay.forEach(function(job) {
-                    cardHTML += '<div class="job-bar" style="background:' + job.color + ';" title="' + escapeHtml(job.name) + '">' + escapeHtml(job.name) + '</div>';
+                    var sched = getScheduleForJobDate(job, dateStr);
+                    var hrs = calculateJobHours(sched);
+                    var label = escapeHtml(job.name) + ' ' + hrs;
+                    cardHTML += '<div class="job-bar" style="background:' + job.color + ';" title="' + escapeHtml(job.name) + ' ' + hrs + 'h">' + label + '</div>';
                 });
             }
             if (isHoliday) {
@@ -145,16 +183,32 @@ function renderCalendar(forceRecompute) {
         card.innerHTML = cardHTML;
         grid.appendChild(card);
 
-        // Insert week number at the start of each new row (after Saturday = dayOfWeek 6)
-        if (dayOfWeek === 6 && d < daysInMonth) {
-            const nextDate = new Date(year, month - 1, d + 1);
-            const wkNum = getISOWeekNumber(nextDate);
-            const wkCell = document.createElement('div');
-            wkCell.className = 'week-number';
-            wkCell.textContent = wkNum;
-            grid.appendChild(wkCell);
+        // End of week row: append total, then week number for next row
+        if (dayOfWeek === 6) {
+            appendWeekTotal();
+            if (d < daysInMonth) {
+                const nextDate = new Date(year, month - 1, d + 1);
+                const wkNum = getISOWeekNumber(nextDate);
+                const wkCell = document.createElement('div');
+                wkCell.className = 'week-number';
+                wkCell.textContent = wkNum;
+                grid.appendChild(wkCell);
+            }
         }
     }
+
+    // If the month doesn't end on Saturday, pad remaining cells + add final total
+    const lastDayOfWeek = new Date(year, month - 1, daysInMonth).getDay();
+    if (lastDayOfWeek !== 6) {
+        for (let i = lastDayOfWeek + 1; i <= 6; i++) {
+            const empty = document.createElement('div');
+            empty.className = 'day-card';
+            empty.style.visibility = 'hidden';
+            grid.appendChild(empty);
+        }
+        appendWeekTotal();
+    }
+
     updateCounter();
     renderMonthSummary(year, month);
     // Refresh overview if visible

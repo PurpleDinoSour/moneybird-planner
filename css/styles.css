@@ -119,9 +119,34 @@ body {
 
 .calendar-grid {
     display: grid;
-    grid-template-columns: 28px repeat(7, 1fr);
+    grid-template-columns: 28px repeat(7, 1fr) 54px;
     gap: 3px;
     justify-content: start;
+}
+.week-total {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.55rem;
+    font-weight: 600;
+    color: var(--muted);
+    min-height: 48px;
+    gap: 1px;
+    line-height: 1.2;
+}
+.week-total .wt-grand {
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: var(--text);
+}
+.week-total .wt-job {
+    font-size: 0.5rem;
+    font-weight: 500;
+    border-radius: 2px;
+    padding: 0 3px;
+    color: #fff;
+    white-space: nowrap;
 }
 .week-number {
     display: flex;

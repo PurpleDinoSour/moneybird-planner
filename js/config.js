@@ -49,7 +49,8 @@ const appState = {
     gitCommitsData: null,
     gitPRsData: null,
     lastCalendarMonth: null,
-    missingDates: []
+    missingDates: [],
+    conceptInvoices: []
 };
 
 // --- WBSO DASHBOARD STATE ---
