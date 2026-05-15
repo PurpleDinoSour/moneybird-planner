@@ -1,4 +1,4 @@
-// Moneybird Planner IV - Settings Modal
+﻿// Moneybird Planner IV - Settings Modal
 // Centralised preferences UI. Mirrors the quick-toggle chips in the action
 // bar and adds settings that do not need to be on the main UI surface
 // (BTW rate, default times, etc.).
@@ -55,10 +55,10 @@
     }
 
     function ensureModal() {
-        var el = document.getElementById('settingsModal');
+        var el = document.getElementById('preferencesModal');
         if (el) return el;
         el = document.createElement('div');
-        el.id = 'settingsModal';
+        el.id = 'preferencesModal';
         el.className = 'settings-modal';
         el.setAttribute('role', 'dialog');
         el.setAttribute('aria-label', 'Preferences');
@@ -109,7 +109,7 @@
     }
 
     function populate(s) {
-        var el = document.getElementById('settingsModal');
+        var el = document.getElementById('preferencesModal');
         if (!el) return;
         el.querySelectorAll('[data-key]').forEach(function (input) {
             var k = input.dataset.key;
@@ -139,7 +139,7 @@
     }
 
     function close() {
-        var el = document.getElementById('settingsModal');
+        var el = document.getElementById('preferencesModal');
         if (el) el.classList.remove('visible');
     }
 
@@ -157,7 +157,7 @@
 
     document.addEventListener('keydown', function (ev) {
         if (ev.key === 'Escape') {
-            var el = document.getElementById('settingsModal');
+            var el = document.getElementById('preferencesModal');
             if (el && el.classList.contains('visible')) {
                 close();
                 ev.stopPropagation();
