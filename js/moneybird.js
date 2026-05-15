@@ -198,25 +198,37 @@ async function registerStandard(config, baseDesc, wbsoComment, matchCommitsToDat
         return;
     }
 
-    // Confirmation
-    var confirmMsg = 'Register ' + entries.length + ' time entries across ' + dates.length + ' days?';
-    if (appState.currentHourType === 'facturable' && appState.jobs.length > 0) {
-        var jobCounts = {};
-        entries.forEach(function(e) {
-            var name = e.jobName || 'Default';
-            if (!jobCounts[name]) jobCounts[name] = 0;
-            jobCounts[name]++;
-        });
-        confirmMsg += '\n\nBreakdown:';
-        Object.keys(jobCounts).forEach(function(name) {
-            confirmMsg += '\n  ' + name + ': ' + jobCounts[name] + ' entries';
-        });
+    // ---- DIFF PREVIEW (optimistic) ----
+    // Pull existing month entries silently and show a NEW/EXISTING/CONFLICT
+    // preview modal instead of a flat confirm().
+    let toRegister = entries;
+    if (window.diffEngine) {
+        const monthKey = document.getElementById('monthPicker').value;
+        let existing = [];
+        try {
+            existing = await window.diffEngine.fetchMonthEntries(config, monthKey);
+        } catch (e) {
+            console.warn('[diff] fetch failed, falling back to plain confirm:', e.message);
+            existing = null;
+        }
+        if (existing !== null) {
+            const diff = window.diffEngine.compute(entries, existing);
+            const result = await window.diffEngine.show(diff);
+            if (!result || !result.confirmed) return; // user cancelled
+            toRegister = result.toRegister || [];
+            if (toRegister.length === 0) return;
+        } else {
+            // Fallback to old confirm flow if Moneybird is unreachable.
+            var confirmMsg = 'Register ' + entries.length + ' time entries across ' + dates.length + ' days?';
+            if (!confirm(confirmMsg)) return;
+        }
+    } else {
+        var confirmMsg = 'Register ' + entries.length + ' time entries across ' + dates.length + ' days?';
+        if (!confirm(confirmMsg)) return;
     }
 
-    if (!confirm(confirmMsg)) return;
-
     let success = 0, failed = 0;
-    for (const entry of entries) {
+    for (const entry of toRegister) {
         try {
             await registerSingleEntry(config, entry.date, entry.description, null, null, {
                 startTime: entry.startTime,

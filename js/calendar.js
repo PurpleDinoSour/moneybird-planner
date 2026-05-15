@@ -66,7 +66,22 @@ function renderCalendar(forceRecompute) {
     const isMonthChange = appState.lastCalendarMonth !== currentMonthKey;
     appState.lastCalendarMonth = currentMonthKey;
 
-    const existingSelections = (isMonthChange || forceRecompute) ? null : new Set(appState.selectedDates);
+    // Persist current month in URL for deep-linking.
+    if (window.urlState) {
+        window.urlState.write({ month: document.getElementById('monthPicker').value });
+    }
+
+    // Try to restore previously saved selection for this (type, month) pair
+    // when the user navigates to a fresh month.
+    let restoredSelection = null;
+    if (isMonthChange && window.selectionState) {
+        const saved = window.selectionState.load(appState.currentHourType, document.getElementById('monthPicker').value);
+        if (saved && saved.length) restoredSelection = new Set(saved);
+    }
+
+    const existingSelections = (isMonthChange || forceRecompute)
+        ? (restoredSelection || null)
+        : new Set(appState.selectedDates);
 
     grid.innerHTML = '';
     if (isMonthChange || forceRecompute) appState.selectedDates.clear();
@@ -213,6 +228,10 @@ function renderCalendar(forceRecompute) {
 
     updateCounter();
     renderMonthSummary(year, month);
+    // Reapply keyboard focus ring after re-render.
+    if (window.keyboardNav) window.keyboardNav.reapplyFocus();
+    // Persist restored selection so the next reload still has it.
+    if (window.selectionState && isMonthChange) window.selectionState.persistCurrent();
     // Keep overview summary synchronized with month and schedules.
     if (document.getElementById('customerOverviewPanel')) {
         renderCustomerOverview();
@@ -310,6 +329,8 @@ function toggleCard(el, dateStr) {
         appState.selectedDates.add(dateStr);
     }
     updateCounter();
+    if (window.selectionState) window.selectionState.persistCurrent();
+    if (window.diffEngine) window.diffEngine.clearCalendarOverlay();
 }
 
 function updateCounter() {
@@ -326,6 +347,8 @@ function clearAll() {
         document.querySelectorAll('.day-card.active').forEach(card => card.classList.remove('active'));
         appState.selectedDates.clear();
         updateCounter();
+        if (window.selectionState) window.selectionState.persistCurrent();
+        if (window.diffEngine) window.diffEngine.clearCalendarOverlay();
     }
 }
 
@@ -348,4 +371,5 @@ function selectAllCalendarDays() {
         appState.selectedDates.add(dateStr);
     }
     updateCounter();
+    if (window.selectionState) window.selectionState.persistCurrent();
 }

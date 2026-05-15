@@ -16,9 +16,19 @@ function init() {
         console.warn('[Jobs] Startup sync failed:', error.message);
     });
 
-    // Set current month
+    // Set current month - URL param wins over today.
     const now = new Date();
-    document.getElementById('monthPicker').value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    let initialMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    let initialView = null;
+    if (window.urlState) {
+        const u = window.urlState.read();
+        if (u.month && /^\d{4}-\d{2}$/.test(u.month)) initialMonth = u.month;
+        if (u.type === 'wbso' || u.type === 'facturable') {
+            appState.currentHourType = u.type;
+        }
+        if (u.view === 'compact' || u.view === 'overview') initialView = u.view;
+    }
+    document.getElementById('monthPicker').value = initialMonth;
 
     // Render job list and calendar
     renderJobsList();
@@ -32,7 +42,12 @@ function init() {
 
     const overviewDetails = document.getElementById('customerOverviewDetails');
     if (overviewDetails) {
+        if (initialView === 'compact') overviewDetails.open = false;
+        if (initialView === 'overview') overviewDetails.open = true;
         overviewDetails.addEventListener('toggle', () => {
+            if (window.urlState) {
+                window.urlState.write({ view: overviewDetails.open ? 'overview' : 'compact' });
+            }
             if (overviewDetails.open) {
                 renderCustomerOverview();
             }

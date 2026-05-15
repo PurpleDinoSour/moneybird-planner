@@ -299,6 +299,7 @@ function getCurrentConfig() {
 function setHourType(type) {
     appState.currentHourType = type;
     saveConfig();
+    if (window.urlState) window.urlState.write({ type: type });
 
     // Update tabs
     document.querySelectorAll('.hour-type-tab').forEach(tab => tab.classList.remove('active'));
@@ -326,6 +327,9 @@ function setHourType(type) {
     } else {
         document.getElementById('desc').placeholder = 'Consultancy uren';
         document.getElementById('desc').value = 'Consultancy uren';
+        // Recompute calendar so the (type, month) saved selection is loaded.
+        appState.lastCalendarMonth = null;
+        if (typeof renderCalendar === 'function') renderCalendar();
     }
 
     updateCounter();
