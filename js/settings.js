@@ -18,7 +18,8 @@
         btwRate: 0.21,
         defaultStart: '09:00',
         defaultEnd: '17:00',
-        defaultLunch: true
+        defaultLunch: true,
+        invoiceLineTemplate: 'Consultancy uren {month} {customer}'
     };
 
     function load() {
@@ -47,6 +48,9 @@
             window.wbsoOverlay.setEnabled(s.wbsoOverlay);
         }
         document.documentElement.dataset.ghostBars = s.showGhostBars ? '1' : '0';
+        // Mirror invoice line template into the legacy localStorage key that
+        // moneybird.js reads directly when patching invoice lines.
+        try { localStorage.setItem('mb3_invoice_line_template', s.invoiceLineTemplate || ''); } catch (e) {}
         // Sync chips
         var ad = document.getElementById('autoDiffToggle');
         if (ad) ad.checked = s.autoDiff;
@@ -84,6 +88,10 @@
             '      <label class="settings-row"><span><strong>Start</strong></span><input type="time" data-key="defaultStart" class="settings-num"></label>',
             '      <label class="settings-row"><span><strong>End</strong></span><input type="time" data-key="defaultEnd" class="settings-num"></label>',
             '      <label class="settings-row"><input type="checkbox" data-key="defaultLunch"><span><strong>Lunch break by default</strong><em>Subtracts 1 hour from each entry</em></span></label>',
+            '    </section>',
+            '    <section class="settings-section">',
+            '      <h4>Invoice line description</h4>',
+            '      <label class="settings-row"><span><strong>Template</strong><em>Used by Bill from linked hours. Tokens: {customer}, {month}, {monthEn}, {monthN}, {year}, {date}</em></span><input type="text" data-key="invoiceLineTemplate" class="settings-text" placeholder="Consultancy uren {month} {customer}"></label>',
             '    </section>',
             '  </div>',
             '  <div class="settings-modal-actions">',

@@ -1305,9 +1305,23 @@ async function billLineFromTimeEntries(invIdx, dIdx, opts) {
         if (!opts.silent) alert('Cannot determine hourly rate. Set hourlyRate on the matching job in jobs-config.json first.');
         return;
     }
+    // Build a fresh line description from the configurable template, expanded with
+    // the customer (= MB contact company name) and the month of the first linked entry.
+    var tmpl = '';
+    try { tmpl = localStorage.getItem('mb3_invoice_line_template') || ''; } catch (e) {}
+    if (!tmpl) tmpl = 'Consultancy uren {month} {customer}';
+    var customerName = (inv.contact && (inv.contact.company_name || inv.contact.firstname)) || '';
+    var firstDate = '';
+    var sortedLinked = linked.slice().sort(function(a, b) {
+        return (a.started_at || '').localeCompare(b.started_at || '');
+    });
+    if (sortedLinked[0] && sortedLinked[0].started_at) firstDate = sortedLinked[0].started_at.substring(0, 10);
+    var newDesc = (typeof expandDescriptionTemplate === 'function')
+        ? expandDescriptionTemplate(tmpl, firstDate, customerName)
+        : tmpl;
     if (!opts.skipConfirm) {
         var msg = 'Bill ' + ids.length + ' linked time entries (' + totalH.toFixed(1) + 'h @ EUR ' + bestRate.toFixed(2) + ') on the line:\n\n'
-            + '"' + (detail.description || '-') + '"\n\n'
+            + 'New description: "' + newDesc + '"\n'
             + 'New line total: EUR ' + (totalH * bestRate).toFixed(2) + '. Continue?';
         if (!confirm(msg)) return;
     }
@@ -1317,6 +1331,7 @@ async function billLineFromTimeEntries(invIdx, dIdx, opts) {
             headers: { 'X-Moneybird-Token': config.token, 'Content-Type': 'application/json' },
             body: JSON.stringify({ sales_invoice: { details_attributes: [ {
                 id: detail.id,
+                description: newDesc,
                 amount: totalH.toFixed(2),
                 price: bestRate.toFixed(2),
                 time_entry_ids: ids
