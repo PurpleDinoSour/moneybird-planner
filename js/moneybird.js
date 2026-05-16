@@ -280,6 +280,32 @@ async function registerSingleEntry(config, date, description, hoursOverride, com
 }
 
 // --- HOURS MANAGEMENT ---
+
+// Returns true if the invoice 'belongs' to a given YYYY-MM month. An invoice
+// can belong to a month either through its invoice_date / created_at, or
+// because one of its detail lines covers that period (MB stores per-line
+// 'period' as YYYYMMDD..YYYYMMDD or YYYYMM). This matters for drafts that
+// were created in month X but actually bill work done in month Y.
+function invoiceMatchesMonth(inv, yyyyMm) {
+    if (!inv || !yyyyMm) return false;
+    var months = {};
+    function add(s) { if (s && s.length >= 7) months[s.substring(0, 7)] = true; }
+    add(inv.invoice_date);
+    add(inv.created_at);
+    if (inv.details && inv.details.length) {
+        inv.details.forEach(function (d) {
+            if (!d || !d.period) return;
+            // Match leading YYYY-MM or YYYYMM occurrences inside the period string.
+            var re = /(\d{4})-?(\d{2})/g;
+            var m;
+            while ((m = re.exec(String(d.period))) !== null) {
+                months[m[1] + '-' + m[2]] = true;
+            }
+        });
+    }
+    return !!months[yyyyMm];
+}
+
 async function fetchExistingHours() {
     const config = getCurrentConfig();
     if (!config.token || !config.adminId) {
@@ -1032,8 +1058,7 @@ function renderConceptInvoicesList() {
     var hiddenCount = 0;
     if (!showAll && monthPrefix) {
         invoices = allInvoices.filter(function (inv) {
-            var d = inv.invoice_date || inv.created_at || '';
-            return d && d.substring(0, 7) === monthPrefix;
+            return invoiceMatchesMonth(inv, monthPrefix);
         });
         hiddenCount = allInvoices.length - invoices.length;
     }
@@ -1412,7 +1437,11 @@ async function linkHoursToInvoice(invIdx) {
         var page = 1;
         var hasMore = true;
         while (hasMore) {
-            var resp = await fetch(CONFIG.API_BASE_URL + '/moneybird/' + config.adminId + '/time_entries?filter=state:open&per_page=100&page=' + page, {
+            // Use period:this_year so detached entries from earlier months in
+            // the year still show up here. Without an explicit period the MB
+            // API tends to default to 'this_month', hiding e.g. May entries
+            // when the user is viewing June.
+            var resp = await fetch(CONFIG.API_BASE_URL + '/moneybird/' + config.adminId + '/time_entries?filter=state:open,period:this_year&per_page=100&page=' + page, {
                 headers: { 'X-Moneybird-Token': config.token }
             });
             if (!resp.ok) throw new Error('API error: ' + resp.status);
