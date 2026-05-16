@@ -64,6 +64,16 @@ function bindEvents() {
 
     // Month picker change
     document.getElementById('monthPicker').addEventListener('change', () => {
+        // Stale Moneybird data from the previous month should not bleed into
+        // the new view. Clear and hide the Existing Hours panel so the user
+        // has to click Manage Hours to fetch fresh data for the new month.
+        if (window.appState) appState.fetchedEntries = [];
+        var hoursSection = document.getElementById('hoursManagementSection');
+        if (hoursSection) hoursSection.style.display = 'none';
+        var hoursList = document.getElementById('hoursList');
+        if (hoursList) hoursList.innerHTML = '';
+        var hoursCount = document.getElementById('hoursCount');
+        if (hoursCount) hoursCount.textContent = '0 entries loaded';
         renderCalendar();
         renderScheduleGrid();
     });

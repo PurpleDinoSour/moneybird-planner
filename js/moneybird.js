@@ -291,11 +291,18 @@ async function fetchExistingHours() {
     if (!picker) { alert('Select a month first'); return; }
 
     const [year, month] = picker.split('-').map(Number);
-    const startDate = `${year}-${String(month).padStart(2, '0')}-01`;
-    const endDate = `${year}-${String(month).padStart(2, '0')}-${new Date(year, month, 0).getDate()}`;
+    const lastDay = new Date(year, month, 0).getDate();
+    // Moneybird's time_entries `period:` range filter expects YYYYMMDD..YYYYMMDD
+    // (no hyphens). Using YYYY-MM-DD here returns HTTP 400.
+    const startCompact = `${year}${String(month).padStart(2, '0')}01`;
+    const endCompact   = `${year}${String(month).padStart(2, '0')}${String(lastDay).padStart(2, '0')}`;
 
     document.getElementById('hoursManagementSection').style.display = 'block';
     document.getElementById('hoursList').innerHTML = '<p style="padding:20px; text-align:center;">Loading...</p>';
+    document.getElementById('hoursCount').textContent = '0 entries loaded';
+    // Clear stale entries from the previously-viewed month so a failed fetch
+    // never leaves last month's data on screen.
+    appState.fetchedEntries = [];
 
     try {
         // Paginate: Moneybird returns max 100 per page
@@ -303,7 +310,7 @@ async function fetchExistingHours() {
         var page = 1;
         var hasMore = true;
         while (hasMore) {
-            const response = await fetch(`${CONFIG.API_BASE_URL}/moneybird/${config.adminId}/time_entries?filter=period:${startDate}..${endDate}&per_page=100&page=${page}`, {
+            const response = await fetch(`${CONFIG.API_BASE_URL}/moneybird/${config.adminId}/time_entries?filter=period:${startCompact}..${endCompact}&per_page=100&page=${page}`, {
                 headers: { 'X-Moneybird-Token': config.token }
             });
 
@@ -320,7 +327,9 @@ async function fetchExistingHours() {
 
         renderHoursList();
     } catch (err) {
+        appState.fetchedEntries = [];
         document.getElementById('hoursList').innerHTML = `<p style="padding:20px; text-align:center; color:var(--danger);">Error: ${err.message}</p>`;
+        document.getElementById('hoursCount').textContent = '0 entries loaded';
     }
 }
 
