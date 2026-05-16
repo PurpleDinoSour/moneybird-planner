@@ -2638,3 +2638,22 @@ body.wbso-mode .tab.active { background: var(--wbso); border-color: var(--wbso);
 .overview-mode { display: inline-block; margin-left: 8px; padding: 2px 8px; font-size: 0.7em; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; border-radius: 999px; vertical-align: middle; }
 .overview-mode-forecast { background: rgba(5,150,105,0.15); color: #34d399; border: 1px solid rgba(5,150,105,0.35); }
 .overview-mode-schedule { background: rgba(148,163,184,0.15); color: #94a3b8; border: 1px solid rgba(148,163,184,0.3); }
+/* Month/Year picker popup */
+.month-picker-row { display: flex; align-items: center; gap: 8px; }
+.month-popup-btn { background: rgba(99,102,241,0.12); color: #c7d2fe; border: 1px solid rgba(99,102,241,0.35); padding: 6px 12px; border-radius: 8px; font-size: 0.85em; font-weight: 600; cursor: pointer; transition: background 0.15s, border-color 0.15s; }
+.month-popup-btn:hover { background: rgba(99,102,241,0.22); border-color: rgba(99,102,241,0.55); }
+.month-popup-btn[aria-expanded="true"] { background: rgba(99,102,241,0.3); border-color: #818cf8; color: #fff; }
+.month-popup { position: fixed; z-index: 9000; width: 260px; background: #0f172a; border: 1px solid rgba(148,163,184,0.25); border-radius: 12px; box-shadow: 0 12px 32px rgba(0,0,0,0.5); padding: 12px; display: none; }
+.month-popup.is-open { display: block; }
+.month-popup-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.month-popup-nav { background: transparent; color: #94a3b8; border: 1px solid rgba(148,163,184,0.25); width: 28px; height: 28px; border-radius: 6px; cursor: pointer; font-size: 0.75em; line-height: 1; display: inline-flex; align-items: center; justify-content: center; }
+.month-popup-nav:hover { background: rgba(148,163,184,0.12); color: #e2e8f0; }
+.month-popup-year { font-size: 1.05em; font-weight: 700; color: #f1f5f9; letter-spacing: 0.02em; }
+.month-popup-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.month-popup-cell { background: rgba(30,41,59,0.6); color: #cbd5e1; border: 1px solid transparent; padding: 8px 0; border-radius: 8px; font-size: 0.85em; font-weight: 600; cursor: pointer; transition: background 0.12s, border-color 0.12s, color 0.12s; }
+.month-popup-cell:hover { background: rgba(99,102,241,0.18); color: #fff; }
+.month-popup-cell.is-today { border-color: rgba(148,163,184,0.45); }
+.month-popup-cell.is-selected { background: #6366f1; color: #fff; border-color: #818cf8; }
+.month-popup-footer { margin-top: 10px; display: flex; justify-content: flex-end; }
+.month-popup-today { background: transparent; color: #94a3b8; border: 1px solid rgba(148,163,184,0.25); padding: 4px 10px; border-radius: 6px; font-size: 0.78em; cursor: pointer; }
+.month-popup-today:hover { background: rgba(148,163,184,0.12); color: #e2e8f0; }
