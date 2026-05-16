@@ -1115,6 +1115,12 @@ function renderConceptInvoicesList() {
         html += '<div id="invoiceDetails' + idx + '" class="invoice-details" hidden>';
         html += '<div class="invoice-actions">';
         html += '<button class="btn btn-sm btn-secondary" onclick="linkHoursToInvoice(' + idx + ')">+ Add Hours</button>';
+        // If the invoice has no detail lines, the user may still have time entries
+        // linked to it (e.g. after a detach that orphaned them). Offer a direct
+        // "generate line" shortcut so they can recover without re-linking.
+        if (!inv.details || inv.details.length === 0) {
+            html += '<button class="btn btn-sm btn-secondary" onclick="generateLineFromLinkedEntries(' + idx + ')">Generate line from linked hours</button>';
+        }
         if (inv.details && inv.details.length > 0) {
             html += '<button class="btn btn-sm btn-ghost" onclick="selectAllInvoiceLines(' + idx + ')">Select All</button>';
             html += '<button class="btn btn-sm btn-ghost" onclick="deselectAllInvoiceLines(' + idx + ')">Deselect All</button>';
@@ -1322,6 +1328,91 @@ function annotateInvoiceLinesWithPreview(idx) {
     if (totalEl && anyUnbilled && bestRate > 0 && totalHours > 0) {
         var projected = (totalHours * bestRate).toFixed(2);
         totalEl.innerHTML = ' &rarr; EUR ' + projected;
+    }
+}
+
+// Recovery helper: when an invoice has 0 detail lines but still has time
+// entries linked to it (orphaned by an earlier detach, or never billed),
+// create a brand new detail line that carries all linked entries. Uses the
+// same description template + rate logic as billLineFromTimeEntries.
+async function generateLineFromLinkedEntries(invIdx) {
+    var config = getCurrentConfig();
+    var inv = appState.conceptInvoices[invIdx];
+    if (!inv) return;
+    // Load linked entries (the lazy cache is only filled when the user expands
+    // the invoice; we can't assume that here).
+    if (!inv.__linkedEntries) {
+        var section = document.getElementById('invoiceLinked' + invIdx);
+        if (!section) {
+            // Force the details panel open so loadInvoiceLinkedEntries has a
+            // DOM node to write into.
+            toggleInvoiceDetails(invIdx);
+        }
+        await loadInvoiceLinkedEntries(invIdx);
+    }
+    var linked = inv.__linkedEntries || [];
+    if (linked.length === 0) {
+        alert('No time entries are linked to this invoice. Use + Add Hours first.');
+        return;
+    }
+    var jobs = (window.appState && Array.isArray(appState.jobs)) ? appState.jobs : [];
+    var totalH = 0;
+    var rateBuckets = {};
+    linked.forEach(function (e) {
+        var h = 0;
+        if (e.started_at && e.ended_at) {
+            h = (new Date(e.ended_at) - new Date(e.started_at)) / 3600000;
+            if (e.paused_duration) h -= e.paused_duration / 3600;
+        }
+        totalH += h;
+        var pid = e.project_id || (e.project && e.project.id) || '';
+        var matchJob = jobs.find(function (j) { return String(j.projectId || '') === String(pid); });
+        var r = matchJob && matchJob.hourlyRate ? matchJob.hourlyRate : 0;
+        rateBuckets[r] = (rateBuckets[r] || 0) + h;
+    });
+    var bestRate = 0, bestHours = -1;
+    Object.keys(rateBuckets).forEach(function (r) {
+        if (rateBuckets[r] > bestHours) { bestHours = rateBuckets[r]; bestRate = parseFloat(r); }
+    });
+    if (!bestRate || bestRate <= 0) {
+        alert('Cannot determine hourly rate. Set hourlyRate on the matching job in jobs-config.json first.');
+        return;
+    }
+    var ids = linked.map(function (e) { return String(e.id); });
+    var tmpl = '';
+    try { tmpl = localStorage.getItem('mb3_invoice_line_template') || ''; } catch (e) {}
+    if (!tmpl) tmpl = 'Consultancy uren {month} {customer}';
+    var customerName = (inv.contact && (inv.contact.company_name || inv.contact.firstname)) || '';
+    var sortedLinked = linked.slice().sort(function (a, b) {
+        return (a.started_at || '').localeCompare(b.started_at || '');
+    });
+    var firstDate = (sortedLinked[0] && sortedLinked[0].started_at) ? sortedLinked[0].started_at.substring(0, 10) : '';
+    var newDesc = (typeof expandDescriptionTemplate === 'function')
+        ? expandDescriptionTemplate(tmpl, firstDate, customerName)
+        : tmpl;
+    var msg = 'Create new invoice line:\n\n'
+        + '  ' + newDesc + '\n'
+        + '  ' + totalH.toFixed(2) + 'h @ EUR ' + bestRate.toFixed(2) + ' = EUR ' + (totalH * bestRate).toFixed(2) + '\n'
+        + '  (' + ids.length + ' time entries)\n\nContinue?';
+    if (!confirm(msg)) return;
+    try {
+        var resp = await fetch(CONFIG.API_BASE_URL + '/moneybird/' + config.adminId + '/sales_invoices/' + inv.id, {
+            method: 'PATCH',
+            headers: { 'X-Moneybird-Token': config.token, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sales_invoice: { details_attributes: [ {
+                description: newDesc,
+                amount: totalH.toFixed(2),
+                price: bestRate.toFixed(2),
+                time_entry_ids: ids
+            } ] } })
+        });
+        if (!resp.ok) {
+            var errText = await resp.text();
+            throw new Error('API ' + resp.status + ': ' + errText);
+        }
+        await fetchConceptInvoices();
+    } catch (err) {
+        alert('Could not create the invoice line: ' + err.message);
     }
 }
 
@@ -1732,15 +1823,23 @@ async function detachSelectedLines(invIdx) {
         return;
     }
 
-    // Collect detail IDs to destroy from the invoice
+    // Collect detail IDs to destroy from the invoice AND the time entry IDs
+    // that need to be unlinked. Moneybird does NOT automatically clear
+    // sales_invoice_id on time entries when a detail line is destroyed, so
+    // entries would otherwise stay billed/orphaned (visible as 'linked' to
+    // the invoice but with no line carrying them).
     var detailsToDestroy = [];
+    var entryIdsToUnlink = [];
     var totalTimeEntries = 0;
     selectedCbs.forEach(function(cb) {
         var dIdx = parseInt(cb.dataset.detail);
         var detail = invoice.details[dIdx];
         if (detail && detail.id) {
             detailsToDestroy.push(detail.id);
-            if (detail.time_entry_ids) totalTimeEntries += detail.time_entry_ids.length;
+            if (detail.time_entry_ids && detail.time_entry_ids.length) {
+                totalTimeEntries += detail.time_entry_ids.length;
+                detail.time_entry_ids.forEach(function (tid) { entryIdsToUnlink.push(String(tid)); });
+            }
         }
     });
 
@@ -1768,7 +1867,34 @@ async function detachSelectedLines(invIdx) {
             body: JSON.stringify({ sales_invoice: { details_attributes: detailsAttributes } })
         });
         if (resp.ok) {
-            alert('Removed ' + detailsToDestroy.length + ' line(s) from invoice. Time entries are now open.');
+            // Now actually unlink the time entries so they return to state:open.
+            // Without this they stay billed/orphaned: linked to the invoice but
+            // no line carries them, and the next +Add Hours picker won't find
+            // them either (state:open filter excludes them).
+            var unlinkSuccess = 0;
+            var unlinkFailed = 0;
+            for (var ui = 0; ui < entryIdsToUnlink.length; ui++) {
+                try {
+                    var ur = await fetch(CONFIG.API_BASE_URL + '/moneybird/' + config.adminId + '/time_entries/' + entryIdsToUnlink[ui], {
+                        method: 'PATCH',
+                        headers: {
+                            'X-Moneybird-Token': config.token,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ time_entry: { sales_invoice_id: null } })
+                    });
+                    if (ur.ok) { unlinkSuccess++; } else { unlinkFailed++; }
+                } catch (e2) {
+                    unlinkFailed++;
+                }
+            }
+            var alertMsg = 'Removed ' + detailsToDestroy.length + ' line(s) from invoice.';
+            if (entryIdsToUnlink.length > 0) {
+                alertMsg += '\n' + unlinkSuccess + ' time entr' + (unlinkSuccess === 1 ? 'y' : 'ies') + ' returned to open';
+                if (unlinkFailed > 0) alertMsg += ' (' + unlinkFailed + ' failed - check console)';
+                alertMsg += '.';
+            }
+            alert(alertMsg);
         } else {
             var errBody = await resp.text();
             alert('Failed to update invoice: ' + resp.status + '\n' + errBody);
