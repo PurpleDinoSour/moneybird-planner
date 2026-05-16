@@ -281,6 +281,26 @@ async function registerSingleEntry(config, date, description, hoursOverride, com
 
 // --- HOURS MANAGEMENT ---
 
+// Derive the end-customer label from a set of time entries. Each entry has a
+// project_id; the matching job in jobs-config carries the human-friendly name
+// like 'DNB' or 'RIVM'. If all entries belong to a single job, returns that
+// job name; if multiple, joins them with ' + '. Returns '' if no entries match
+// any configured job so the caller can fall back to the MB contact name.
+function deriveEndCustomerName(entries, jobs) {
+    if (!entries || !entries.length || !jobs || !jobs.length) return '';
+    var names = {};
+    entries.forEach(function (e) {
+        var pid = e.project_id || (e.project && e.project.id) || '';
+        if (!pid) return;
+        var match = jobs.find(function (j) { return String(j.projectId || '') === String(pid); });
+        if (match && match.name) names[match.name] = true;
+    });
+    var list = Object.keys(names);
+    if (list.length === 0) return '';
+    list.sort();
+    return list.join(' + ');
+}
+
 // Returns true if the invoice 'belongs' to a given YYYY-MM month. An invoice
 // can belong to a month either through its invoice_date / created_at, or
 // because one of its detail lines covers that period (MB stores per-line
@@ -1382,7 +1402,11 @@ async function generateLineFromLinkedEntries(invIdx) {
     var tmpl = '';
     try { tmpl = localStorage.getItem('mb3_invoice_line_template') || ''; } catch (e) {}
     if (!tmpl) tmpl = 'Consultancy uren {month} {customer}';
-    var customerName = (inv.contact && (inv.contact.company_name || inv.contact.firstname)) || '';
+    // End customer = the job(s) the entries belong to (DNB/RIVM), not the MB
+    // contact (often a broker like Wortell People).
+    var customerName = deriveEndCustomerName(linked, jobs)
+        || (inv.contact && (inv.contact.company_name || inv.contact.firstname))
+        || '';
     var sortedLinked = linked.slice().sort(function (a, b) {
         return (a.started_at || '').localeCompare(b.started_at || '');
     });
@@ -1458,11 +1482,15 @@ async function billLineFromTimeEntries(invIdx, dIdx, opts) {
         return;
     }
     // Build a fresh line description from the configurable template, expanded with
-    // the customer (= MB contact company name) and the month of the first linked entry.
+    // the END customer (= the matching job name like DNB/RIVM, not the MB contact
+    // which is usually the broker e.g. Wortell People) and the month of the first
+    // linked entry.
     var tmpl = '';
     try { tmpl = localStorage.getItem('mb3_invoice_line_template') || ''; } catch (e) {}
     if (!tmpl) tmpl = 'Consultancy uren {month} {customer}';
-    var customerName = (inv.contact && (inv.contact.company_name || inv.contact.firstname)) || '';
+    var customerName = deriveEndCustomerName(linked, jobs)
+        || (inv.contact && (inv.contact.company_name || inv.contact.firstname))
+        || '';
     var firstDate = '';
     var sortedLinked = linked.slice().sort(function(a, b) {
         return (a.started_at || '').localeCompare(b.started_at || '');
