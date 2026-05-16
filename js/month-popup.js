@@ -1,8 +1,7 @@
 // Moneybird Planner IV - Month/Year Picker Popup
-// Clickable popover with year navigation + 4x3 month grid. Sits next to the
-// native <input type="month"> so manual typing keeps working as before. Picking
-// a month writes the value back into #monthPicker and dispatches 'change' so
-// every existing listener (renderCalendar, overview, autoDiff, ...) just runs.
+// Two views: 'months' (year nav + 12 months) and 'years' (decade nav + 12 years).
+// Picking a month writes the value back into #monthPicker and dispatches 'change'
+// so every existing listener (renderCalendar, overview, autoDiff, ...) just runs.
 
 (function () {
     'use strict';
@@ -10,6 +9,8 @@
     var MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     var popupEl = null;
     var viewYear = null;
+    var viewDecade = null;   // first year of currently displayed 12-year block
+    var mode = 'months';     // 'months' | 'years'
 
     function getPickerInput() { return document.getElementById('monthPicker'); }
     function getTriggerBtn() { return document.getElementById('monthPopupBtn'); }
@@ -31,46 +32,89 @@
         popupEl.className = 'month-popup';
         popupEl.setAttribute('role', 'dialog');
         popupEl.setAttribute('aria-label', 'Pick month');
-        popupEl.innerHTML = [
-            '<div class="month-popup-header">',
-            '  <button type="button" class="month-popup-nav" data-nav="-1" aria-label="Previous year">&#9664;</button>',
-            '  <span class="month-popup-year" id="monthPopupYear"></span>',
-            '  <button type="button" class="month-popup-nav" data-nav="1" aria-label="Next year">&#9654;</button>',
-            '</div>',
-            '<div class="month-popup-grid" id="monthPopupGrid"></div>',
-            '<div class="month-popup-footer">',
-            '  <button type="button" class="month-popup-today" id="monthPopupToday">This month</button>',
-            '</div>'
-        ].join('');
         document.body.appendChild(popupEl);
-
-        popupEl.addEventListener('click', function (ev) {
-            var nav = ev.target.closest('[data-nav]');
-            if (nav) { viewYear += parseInt(nav.dataset.nav, 10); renderGrid(); return; }
-            var cell = ev.target.closest('[data-month]');
-            if (cell) { apply(viewYear, parseInt(cell.dataset.month, 10)); return; }
-            if (ev.target.id === 'monthPopupToday') {
-                var n = new Date(); apply(n.getFullYear(), n.getMonth() + 1); return;
-            }
-        });
-
         return popupEl;
     }
 
-    function renderGrid() {
+    function render() {
+        ensurePopup();
+        if (mode === 'months') renderMonths();
+        else renderYears();
+    }
+
+    function renderMonths() {
         var sel = currentSelection();
         var todayY = new Date().getFullYear();
         var todayM = new Date().getMonth() + 1;
-        document.getElementById('monthPopupYear').textContent = viewYear;
-        var grid = document.getElementById('monthPopupGrid');
-        var html = '';
+
+        popupEl.innerHTML = ''
+            + '<div class="month-popup-header">'
+            + '  <button type="button" class="month-popup-nav" id="mpNavPrev" aria-label="Previous year">&#9664;</button>'
+            + '  <button type="button" class="month-popup-year-btn" id="mpYearBtn" title="Pick a year">' + viewYear + '</button>'
+            + '  <button type="button" class="month-popup-nav" id="mpNavNext" aria-label="Next year">&#9654;</button>'
+            + '</div>'
+            + '<div class="month-popup-grid" id="mpGrid"></div>'
+            + '<div class="month-popup-footer">'
+            + '  <button type="button" class="month-popup-today" id="mpToday">This month</button>'
+            + '</div>';
+
+        var gridHtml = '';
         for (var m = 1; m <= 12; m++) {
             var cls = 'month-popup-cell';
             if (viewYear === sel.year && m === sel.month) cls += ' is-selected';
             if (viewYear === todayY && m === todayM) cls += ' is-today';
-            html += '<button type="button" class="' + cls + '" data-month="' + m + '">' + MONTHS_SHORT[m - 1] + '</button>';
+            gridHtml += '<button type="button" class="' + cls + '" data-month="' + m + '">' + MONTHS_SHORT[m - 1] + '</button>';
         }
-        grid.innerHTML = html;
+        document.getElementById('mpGrid').innerHTML = gridHtml;
+
+        document.getElementById('mpNavPrev').addEventListener('click', function (e) { e.stopPropagation(); viewYear -= 1; renderMonths(); });
+        document.getElementById('mpNavNext').addEventListener('click', function (e) { e.stopPropagation(); viewYear += 1; renderMonths(); });
+        document.getElementById('mpYearBtn').addEventListener('click', function (e) { e.stopPropagation(); openYearView(); });
+        document.getElementById('mpToday').addEventListener('click', function (e) { e.stopPropagation(); var n = new Date(); apply(n.getFullYear(), n.getMonth() + 1); });
+        document.getElementById('mpGrid').querySelectorAll('[data-month]').forEach(function (b) {
+            b.addEventListener('click', function (e) { e.stopPropagation(); apply(viewYear, parseInt(b.dataset.month, 10)); });
+        });
+    }
+
+    function openYearView() {
+        viewDecade = viewYear - (((viewYear % 12) + 12) % 12); // align to 12-year block
+        mode = 'years';
+        renderYears();
+    }
+
+    function renderYears() {
+        var sel = currentSelection();
+        var todayY = new Date().getFullYear();
+        var rangeLabel = viewDecade + ' - ' + (viewDecade + 11);
+
+        popupEl.innerHTML = ''
+            + '<div class="month-popup-header">'
+            + '  <button type="button" class="month-popup-nav" id="mpNavPrev" aria-label="Previous years">&#9664;</button>'
+            + '  <button type="button" class="month-popup-year-btn" id="mpBackBtn" title="Back to months">' + rangeLabel + '</button>'
+            + '  <button type="button" class="month-popup-nav" id="mpNavNext" aria-label="Next years">&#9654;</button>'
+            + '</div>'
+            + '<div class="month-popup-grid" id="mpGrid"></div>'
+            + '<div class="month-popup-footer">'
+            + '  <button type="button" class="month-popup-today" id="mpToday">This month</button>'
+            + '</div>';
+
+        var gridHtml = '';
+        for (var i = 0; i < 12; i++) {
+            var y = viewDecade + i;
+            var cls = 'month-popup-cell';
+            if (y === sel.year) cls += ' is-selected';
+            if (y === todayY) cls += ' is-today';
+            gridHtml += '<button type="button" class="' + cls + '" data-year="' + y + '">' + y + '</button>';
+        }
+        document.getElementById('mpGrid').innerHTML = gridHtml;
+
+        document.getElementById('mpNavPrev').addEventListener('click', function (e) { e.stopPropagation(); viewDecade -= 12; renderYears(); });
+        document.getElementById('mpNavNext').addEventListener('click', function (e) { e.stopPropagation(); viewDecade += 12; renderYears(); });
+        document.getElementById('mpBackBtn').addEventListener('click', function (e) { e.stopPropagation(); mode = 'months'; renderMonths(); });
+        document.getElementById('mpToday').addEventListener('click', function (e) { e.stopPropagation(); var n = new Date(); apply(n.getFullYear(), n.getMonth() + 1); });
+        document.getElementById('mpGrid').querySelectorAll('[data-year]').forEach(function (b) {
+            b.addEventListener('click', function (e) { e.stopPropagation(); viewYear = parseInt(b.dataset.year, 10); mode = 'months'; renderMonths(); });
+        });
     }
 
     function position() {
@@ -88,7 +132,8 @@
         ensurePopup();
         var sel = currentSelection();
         viewYear = sel.year;
-        renderGrid();
+        mode = 'months';
+        render();
         popupEl.classList.add('is-open');
         position();
         var btn = getTriggerBtn(); if (btn) btn.setAttribute('aria-expanded', 'true');
@@ -119,7 +164,7 @@
         });
         document.addEventListener('click', function (ev) {
             if (!isOpen()) return;
-            if (popupEl.contains(ev.target) || ev.target === btn) return;
+            if (popupEl && (popupEl.contains(ev.target) || ev.target === btn)) return;
             close();
         });
         document.addEventListener('keydown', function (ev) {
