@@ -6,7 +6,7 @@
                      "color":  "#3B82F6",
                      "projectId":  "483870075814676273",
                      "projectName":  "DNB",
-                     "description":  "Consultancy uren {month} {job}",
+                     "description":  "Consultancy uren",
                      "hourlyRate":  107.5,
                      "schedule":  {
                                       "1":  {
@@ -62,7 +62,7 @@
                      "color":  "#06B6D4",
                      "projectId":  "478308704970605831",
                      "projectName":  "Rijksinstituut voor Volksgezondheid en Milieu (RIVM)",
-                     "description":  "Consultancy uren {month} {job}",
+                     "description":  "Consultancy uren",
                      "hourlyRate":  112,
                      "schedule":  {
                                       "2":  {
@@ -82,5 +82,5 @@
                                        }
                  }
              ],
-    "lastModified":  "2026-05-16T09:08:25.251Z"
+    "lastModified":  "2026-05-16T09:11:17.654Z"
 }
