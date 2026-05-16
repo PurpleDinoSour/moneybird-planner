@@ -618,7 +618,8 @@ function openJobEditor(jobId) {
 
     // Description
     html += '<div class="editor-field"><label>Description (for invoice)</label>';
-    html += '<input type="text" id="jobEditorDesc" value="' + escapeHtml(job.description) + '" placeholder="Consultancy uren"></div>';
+    html += '<input type="text" id="jobEditorDesc" value="' + escapeHtml(job.description) + '" placeholder="Consultancy uren {month} {job}">';
+    html += '<p class="editor-hint">Tokens: <code>{job}</code> (= ' + escapeHtml(job.name || 'name') + '), <code>{customer}</code>, <code>{month}</code> (mei, juni...), <code>{monthEn}</code>, <code>{monthN}</code> (05), <code>{year}</code>, <code>{date}</code>. Expanded per time entry on register.</p></div>';
 
     // Schedule
     html += '<div class="editor-field"><label>Schedule</label>';

@@ -40,7 +40,9 @@
                         : { start: '09:00', end: '17:00', lunch: true };
                     entries.push({
                         date: date,
-                        description: job.description || baseDesc,
+                        description: (typeof expandDescriptionTemplate === 'function')
+                            ? expandDescriptionTemplate(job.description || baseDesc, date, job.name)
+                            : (job.description || baseDesc),
                         startTime: sched.start,
                         endTime: sched.end,
                         lunch: sched.lunch,

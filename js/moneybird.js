@@ -575,7 +575,9 @@ async function registerMissingDays() {
                 var sched = getScheduleForJobDate(job, date);
                 entries.push({
                     date: date,
-                    description: job.description || desc,
+                    description: (typeof expandDescriptionTemplate === 'function')
+                        ? expandDescriptionTemplate(job.description || desc, date, job.name)
+                        : (job.description || desc),
                     startTime: sched.start,
                     endTime: sched.end,
                     lunch: sched.lunch,

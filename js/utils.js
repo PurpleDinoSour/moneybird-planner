@@ -358,3 +358,35 @@ function updateTimeNotation() {
     // Update calendar hours display
     renderCalendar();
 }
+
+// Expand template tokens in a description string. Lets users put '{job} {month}'
+// in a job's description so each registered time entry reads e.g.
+// "Consultancy uren mei DNB" instead of just "Consultancy uren".
+// Tokens (case-insensitive):
+//   {job}      -> jobName (e.g. DNB, RIVM) -- alias: {customer}
+//   {month}    -> Dutch month name (mei, juni, ...)
+//   {monthEn}  -> English month name (May, June, ...)
+//   {monthN}   -> zero-padded month number (05)
+//   {year}     -> 4-digit year (2026)
+//   {date}     -> ISO date (2026-05-16)
+function expandDescriptionTemplate(template, dateStr, jobName) {
+    if (!template) return template;
+    if (template.indexOf('{') === -1) return template;
+    var d = dateStr ? new Date(dateStr) : new Date();
+    if (isNaN(d.getTime())) d = new Date();
+    var monthsNL = ['januari','februari','maart','april','mei','juni','juli','augustus','september','oktober','november','december'];
+    var monthsEN = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    var map = {
+        job:      jobName || '',
+        customer: jobName || '',
+        month:    monthsNL[d.getMonth()],
+        monthen:  monthsEN[d.getMonth()],
+        monthn:   String(d.getMonth() + 1).padStart(2, '0'),
+        year:     String(d.getFullYear()),
+        date:     (dateStr || d.toISOString().substring(0, 10))
+    };
+    return template.replace(/\{(\w+)\}/g, function(m, key) {
+        var k = String(key).toLowerCase();
+        return Object.prototype.hasOwnProperty.call(map, k) ? map[k] : m;
+    });
+}
