@@ -74,9 +74,22 @@ function bindEvents() {
         if (hoursList) hoursList.innerHTML = '';
         var hoursCount = document.getElementById('hoursCount');
         if (hoursCount) hoursCount.textContent = '0 entries loaded';
+        // Concept invoices are filtered to the picked month, so re-render to
+        // narrow the list (or show 0 if no drafts exist for the new month).
+        if (typeof renderConceptInvoicesList === 'function' && window.appState && appState.conceptInvoices) {
+            renderConceptInvoicesList();
+        }
         renderCalendar();
         renderScheduleGrid();
     });
+
+    // Concept invoice month-filter toggle
+    var ciToggle = document.getElementById('conceptInvoiceShowAll');
+    if (ciToggle) {
+        ciToggle.addEventListener('change', function () {
+            if (typeof renderConceptInvoicesList === 'function') renderConceptInvoicesList();
+        });
+    }
 
     // Settings save on input change
     const settingsInputs = document.querySelectorAll('#settingsModal input, #settingsModal select');

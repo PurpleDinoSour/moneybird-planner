@@ -2660,3 +2660,7 @@ body.wbso-mode .tab.active { background: var(--wbso); border-color: var(--wbso);
 /* Month popup -- year button (clickable to open year-grid) */
 .month-popup-year-btn { background: transparent; color: #f1f5f9; border: 1px solid transparent; padding: 4px 12px; border-radius: 8px; font-size: 1.05em; font-weight: 700; letter-spacing: 0.02em; cursor: pointer; transition: background 0.12s, border-color 0.12s; }
 .month-popup-year-btn:hover { background: rgba(99,102,241,0.18); border-color: rgba(99,102,241,0.35); color: #fff; }
+/* Concept Invoices month-filter toggle */
+.invoice-filter-toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 0.8em; color: #94a3b8; cursor: pointer; user-select: none; padding: 4px 10px; border: 1px solid rgba(148,163,184,0.25); border-radius: 8px; transition: background 0.12s, color 0.12s, border-color 0.12s; }
+.invoice-filter-toggle:hover { background: rgba(148,163,184,0.08); color: #cbd5e1; }
+.invoice-filter-toggle input { accent-color: #6366f1; }

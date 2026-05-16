@@ -244,7 +244,10 @@
                         <h3 class="card-title">Concept Invoices</h3>
                         <p class="card-subtitle" id="conceptInvoiceCount">0 invoices loaded</p>
                     </div>
-                    <button class="btn btn-ghost" onclick="document.getElementById('conceptInvoicesSection').style.display='none';">Close</button>
+                    <div style="display:flex; gap:8px; align-items:center;">
+                        <label class="invoice-filter-toggle"><input type="checkbox" id="conceptInvoiceShowAll"><span>Show all months</span></label>
+                        <button class="btn btn-ghost" onclick="document.getElementById('conceptInvoicesSection').style.display='none';">Close</button>
+                    </div>
                 </div>
                 <div id="conceptInvoicesList"></div>
             </div>

@@ -1019,17 +1019,44 @@ async function fetchConceptInvoices() {
 
 function renderConceptInvoicesList() {
     var list = document.getElementById('conceptInvoicesList');
-    var invoices = appState.conceptInvoices || [];
+    var allInvoices = appState.conceptInvoices || [];
 
-    document.getElementById('conceptInvoiceCount').textContent = invoices.length + ' concept invoice' + (invoices.length !== 1 ? 's' : '');
+    // Filter to the month currently picked in the calendar so switching months
+    // also narrows the invoice view. Users can opt out with "Show all months".
+    var showAll = false;
+    var toggle = document.getElementById('conceptInvoiceShowAll');
+    if (toggle) showAll = !!toggle.checked;
+    var pickerVal = (document.getElementById('monthPicker') || {}).value || '';
+    var monthPrefix = pickerVal; // already YYYY-MM
+    var invoices = allInvoices;
+    var hiddenCount = 0;
+    if (!showAll && monthPrefix) {
+        invoices = allInvoices.filter(function (inv) {
+            var d = inv.invoice_date || inv.created_at || '';
+            return d && d.substring(0, 7) === monthPrefix;
+        });
+        hiddenCount = allInvoices.length - invoices.length;
+    }
+
+    var monthLabel = monthPrefix ? (' for ' + monthPrefix) : '';
+    var label = invoices.length + ' concept invoice' + (invoices.length !== 1 ? 's' : '') + (showAll ? '' : monthLabel);
+    if (!showAll && hiddenCount > 0) label += ' (' + hiddenCount + ' in other months hidden)';
+    document.getElementById('conceptInvoiceCount').textContent = label;
 
     if (invoices.length === 0) {
-        list.innerHTML = '<p class="invoice-empty">No concept invoices found</p>';
+        var emptyMsg = (!showAll && hiddenCount > 0)
+            ? 'No concept invoices for ' + monthPrefix + '. ' + hiddenCount + ' draft(s) exist in other months -- enable "Show all months" above to see them.'
+            : 'No concept invoices found';
+        list.innerHTML = '<p class="invoice-empty">' + escapeHtml(emptyMsg) + '</p>';
         return;
     }
 
     var html = '<div class="concept-invoice-list">';
-    invoices.forEach(function(inv, idx) {
+    invoices.forEach(function(inv, _displayIdx) {
+        // Use the index into the *full* appState.conceptInvoices array so that
+        // every onclick handler (toggleInvoiceDetails, linkHoursToInvoice, ...)
+        // still resolves to the correct invoice when the list is filtered.
+        var idx = allInvoices.indexOf(inv);
         var contactName = (inv.contact && inv.contact.company_name) ? inv.contact.company_name : (inv.contact ? inv.contact.firstname + ' ' + inv.contact.lastname : 'Unknown');
         var totalPrice = inv.total_price_incl_tax_base ? parseFloat(inv.total_price_incl_tax_base).toFixed(2) : '0.00';
         var detailCount = inv.details ? inv.details.length : 0;
