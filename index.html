@@ -306,7 +306,7 @@
             <div class="row">
                 <div>
                     <label>API Token</label>
-                    <input type="password" id="apiTokenBV" onchange="saveConfig()">
+                    <input type="text" id="apiTokenBV" class="secret-input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" onchange="saveConfig()">
                 </div>
                 <div>
                     <label>Admin ID</label>
@@ -337,7 +337,7 @@
             <div class="row">
                 <div>
                     <label>API Token</label>
-                    <input type="password" id="apiTokenHolding" onchange="saveConfig()">
+                    <input type="text" id="apiTokenHolding" class="secret-input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" onchange="saveConfig()">
                 </div>
                 <div>
                     <label>Admin ID</label>
@@ -389,7 +389,7 @@
                 <div class="row">
                     <div>
                         <label>GitHub Token (optional)</label>
-                        <input type="password" id="githubToken" onchange="saveConfig()" placeholder="ghp_xxxx...">
+                        <input type="text" id="githubToken" class="secret-input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" onchange="saveConfig()" placeholder="ghp_xxxx...">
                     </div>
                     <div>
                         <label>Repository</label>
@@ -417,11 +417,11 @@
                 <div class="row">
                     <div id="azureTokenCol">
                         <label id="azureTokenLabel">PAT Token</label>
-                        <input type="password" id="azureToken" onchange="saveConfig()">
+                        <input type="text" id="azureToken" class="secret-input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" onchange="saveConfig()">
                     </div>
                     <div id="azurePasswordCol" style="display:none;">
                         <label>Password</label>
-                        <input type="password" id="azurePassword" onchange="saveConfig()">
+                        <input type="text" id="azurePassword" class="secret-input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" onchange="saveConfig()">
                     </div>
                     <div>
                         <label>Organization</label>
