@@ -1264,45 +1264,66 @@ function annotateInvoiceLinesWithPreview(idx) {
 
 // Attach all time entries currently linked to the invoice to a specific detail line
 // so Moneybird recomputes qty + rate from the entries instead of the manual values.
-async function billLineFromTimeEntries(invIdx, dIdx) {
+async function billLineFromTimeEntries(invIdx, dIdx, opts) {
+    opts = opts || {};
     var config = getCurrentConfig();
     var inv = appState.conceptInvoices[invIdx];
     if (!inv || !inv.details || !inv.details[dIdx]) return;
     var detail = inv.details[dIdx];
     var linked = inv.__linkedEntries;
     if (!linked) {
-        // Make sure we have them.
         await loadInvoiceLinkedEntries(invIdx);
         linked = inv.__linkedEntries;
     }
     if (!linked || linked.length === 0) {
-        alert('No time entries are linked to this invoice yet. Use + Add Hours first.');
+        if (!opts.silent) alert('No time entries are linked to this invoice yet. Use + Add Hours first.');
         return;
     }
     var ids = linked.map(function(e) { return String(e.id); });
+    var jobs = (window.appState && Array.isArray(appState.jobs)) ? appState.jobs : [];
     var totalH = 0;
+    var rateBuckets = {};
     linked.forEach(function(e) {
+        var h = 0;
         if (e.started_at && e.ended_at) {
-            var h = (new Date(e.ended_at) - new Date(e.started_at)) / 3600000;
+            h = (new Date(e.ended_at) - new Date(e.started_at)) / 3600000;
             if (e.paused_duration) h -= e.paused_duration / 3600;
-            totalH += h;
         }
+        totalH += h;
+        var pid = e.project_id || (e.project && e.project.id) || '';
+        var matchJob = jobs.find(function(j) { return String(j.projectId || '') === String(pid); });
+        var r = matchJob && matchJob.hourlyRate ? matchJob.hourlyRate : 0;
+        rateBuckets[r] = (rateBuckets[r] || 0) + h;
     });
-    var msg = 'Bill ' + ids.length + ' linked time entries (' + totalH.toFixed(1) + 'h) on the line:\n\n'
-        + '"' + (detail.description || '-') + '"\n\n'
-        + 'Moneybird will replace the line\'s qty + rate with values derived from the linked time entries (qty = sum of hours, rate = project hourly rate). Continue?';
-    if (!confirm(msg)) return;
+    var bestRate = 0, bestHours = -1;
+    Object.keys(rateBuckets).forEach(function(r) {
+        if (rateBuckets[r] > bestHours) { bestHours = rateBuckets[r]; bestRate = parseFloat(r); }
+    });
+    if (!bestRate || bestRate <= 0) {
+        if (!opts.silent) alert('Cannot determine hourly rate. Set hourlyRate on the matching job in jobs-config.json first.');
+        return;
+    }
+    if (!opts.skipConfirm) {
+        var msg = 'Bill ' + ids.length + ' linked time entries (' + totalH.toFixed(1) + 'h @ EUR ' + bestRate.toFixed(2) + ') on the line:\n\n'
+            + '"' + (detail.description || '-') + '"\n\n'
+            + 'New line total: EUR ' + (totalH * bestRate).toFixed(2) + '. Continue?';
+        if (!confirm(msg)) return;
+    }
     try {
         var resp = await fetch(CONFIG.API_BASE_URL + '/moneybird/' + config.adminId + '/sales_invoices/' + inv.id, {
             method: 'PATCH',
             headers: { 'X-Moneybird-Token': config.token, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ sales_invoice: { details_attributes: [ { id: detail.id, time_entry_ids: ids } ] } })
+            body: JSON.stringify({ sales_invoice: { details_attributes: [ {
+                id: detail.id,
+                amount: totalH.toFixed(2),
+                price: bestRate.toFixed(2),
+                time_entry_ids: ids
+            } ] } })
         });
         if (!resp.ok) {
             var errText = await resp.text();
             throw new Error('API ' + resp.status + ': ' + errText);
         }
-        // Refresh the invoices list so qty + rate update.
         await fetchConceptInvoices();
     } catch (err) {
         alert('Could not update the invoice line: ' + err.message);
@@ -1438,9 +1459,25 @@ async function linkHoursToInvoice(invIdx) {
 
         var msg = 'Linked ' + success + ' time entr' + (success === 1 ? 'y' : 'ies') + ' to invoice';
         if (failed > 0) msg += ', ' + failed + ' failed';
-        msg += '.\n\nThe link is set on the time entries, but the invoice line still shows its original qty/rate. Expand the invoice and click "Bill from linked hours" on the line to roll the hours into the total.';
+
+        // If the invoice has exactly one detail line, auto-bill it so qty + rate
+        // update in Moneybird immediately without a second click.
+        var autoBilled = false;
+        if (success > 0 && invoice.details && invoice.details.length === 1) {
+            await fetchConceptInvoices();
+            // Re-find invoice by id after refresh (index may have shifted).
+            var newIdx = appState.conceptInvoices.findIndex(function(x) { return x.id === invoice.id; });
+            if (newIdx >= 0) {
+                await loadInvoiceLinkedEntries(newIdx);
+                await billLineFromTimeEntries(newIdx, 0, { silent: true, skipConfirm: true });
+                autoBilled = true;
+            }
+        }
+        msg += autoBilled
+            ? '.\n\nInvoice line auto-updated with qty + rate from the linked hours.'
+            : '.\n\nThe link is set on the time entries, but the invoice has multiple lines so qty/rate were not auto-updated. Expand the invoice and click "Bill from linked hours" on the right line.';
         alert(msg);
-        fetchConceptInvoices();
+        if (!autoBilled) fetchConceptInvoices();
     } catch (err) {
         alert('Error fetching time entries: ' + err.message);
     }
