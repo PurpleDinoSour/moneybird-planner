@@ -5,19 +5,42 @@
 
 var BTW_RATE = (window.pricing && window.pricing.BTW_RATE) || 0.21;
 
-// Calculate total working hours for a job in a given month
+// Calculate total working hours for a job in a given month.
+// If the user has selected days on the calendar for this month (the forecast),
+// only those selected days count -- so the overview always matches what is
+// visibly highlighted. Falls back to the full job schedule when there is no
+// selection in the displayed month (e.g. a freshly opened month).
 function getJobMonthHours(job, year, month) {
     var totalHours = 0;
+    var monthPrefix = year + '-' + String(month).padStart(2, '0') + '-';
     var daysInMonth = new Date(year, month, 0).getDate();
 
+    var selected = (window.appState && appState.selectedDates) ? appState.selectedDates : null;
+    var selectedInMonth = 0;
+    if (selected && selected.size > 0) {
+        selected.forEach(function (d) { if (d && d.indexOf(monthPrefix) === 0) selectedInMonth++; });
+    }
+    var useSelection = selectedInMonth > 0;
+
     for (var day = 1; day <= daysInMonth; day++) {
-        var dateStr = year + '-' + String(month).padStart(2, '0') + '-' + String(day).padStart(2, '0');
-        if (isJobActiveOnDate(job, dateStr)) {
-            var sched = getScheduleForJobDate(job, dateStr);
-            totalHours += calculateJobHours(sched);
-        }
+        var dateStr = monthPrefix + String(day).padStart(2, '0');
+        if (useSelection && !selected.has(dateStr)) continue;
+        if (!isJobActiveOnDate(job, dateStr)) continue;
+        var sched = getScheduleForJobDate(job, dateStr);
+        totalHours += calculateJobHours(sched);
     }
     return totalHours;
+}
+
+// Returns true if the overview is currently driven by the user's calendar
+// selection (i.e. the displayed month has selected days).
+function isOverviewUsingSelection(year, month) {
+    var monthPrefix = year + '-' + String(month).padStart(2, '0') + '-';
+    var selected = (window.appState && appState.selectedDates) ? appState.selectedDates : null;
+    if (!selected || selected.size === 0) return false;
+    var hit = false;
+    selected.forEach(function (d) { if (!hit && d && d.indexOf(monthPrefix) === 0) hit = true; });
+    return hit;
 }
 
 // Build overview data for all jobs for a given month
@@ -69,10 +92,14 @@ function renderCustomerOverview() {
     var month = parts[1];
     var data = buildOverviewData(year, month);
 
-    // Month label
+    // Month label + mode badge (forecast based on selection vs full schedule)
+    var usingSel = isOverviewUsingSelection(year, month);
+    var modeBadge = usingSel
+        ? ' <span class="overview-mode overview-mode-forecast" title="Based on your selected days on the calendar">Forecast</span>'
+        : ' <span class="overview-mode overview-mode-schedule" title="No days selected for this month -- showing full job schedule">Schedule</span>';
     var monthLabel = MONTH_NAMES[month - 1] + ' ' + year;
     var titleEl = document.getElementById('overviewMonthLabel');
-    if (titleEl) titleEl.textContent = monthLabel;
+    if (titleEl) titleEl.innerHTML = escapeHtml(monthLabel) + modeBadge;
 
     var summaryHoursEl = document.getElementById('overviewSummaryHours');
     if (summaryHoursEl) summaryHoursEl.textContent = data.totals.hours.toFixed(1) + 'h';

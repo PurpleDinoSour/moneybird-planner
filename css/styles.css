@@ -2612,3 +2612,29 @@ body.wbso-mode .tab.active { background: var(--wbso); border-color: var(--wbso);
     font-family: var(--font-mono, monospace);
     font-size: 0.95em;
 }
+/* Financial Overview mode badge (Forecast vs Schedule) */
+.overview-mode {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 2px 8px;
+    font-size: 0.7em;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    border-radius: 999px;
+    vertical-align: middle;
+}
+.overview-mode-forecast {
+    background: rgba(5, 150, 105, 0.15);
+    color: #34d399;
+    border: 1px solid rgba(5, 150, 105, 0.35);
+}
+.overview-mode-schedule {
+    background: rgba(148, 163, 184, 0.15);
+    color: #94a3b8;
+    border: 1px solid rgba(148, 163, 184, 0.3);
+}
+/* Financial Overview mode badge (Forecast vs Schedule) */
+.overview-mode { display: inline-block; margin-left: 8px; padding: 2px 8px; font-size: 0.7em; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; border-radius: 999px; vertical-align: middle; }
+.overview-mode-forecast { background: rgba(5,150,105,0.15); color: #34d399; border: 1px solid rgba(5,150,105,0.35); }
+.overview-mode-schedule { background: rgba(148,163,184,0.15); color: #94a3b8; border: 1px solid rgba(148,163,184,0.3); }

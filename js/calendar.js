@@ -374,6 +374,11 @@ function toggleCard(el, dateStr) {
 function updateCounter() {
     const typeLabel = appState.currentHourType === 'wbso' ? 'WBSO' : 'Facturable';
     document.getElementById('selectionCount').innerText = `${appState.selectedDates.size} days selected (${typeLabel})`;
+    // Keep the Financial Overview in sync with the live selection so the
+    // forecast totals update as the user clicks days.
+    if (typeof renderCustomerOverview === 'function') {
+        try { renderCustomerOverview(); } catch (e) {}
+    }
 }
 
 function clearAll() {
