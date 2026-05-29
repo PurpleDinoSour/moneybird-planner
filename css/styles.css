@@ -2486,6 +2486,20 @@ body.wbso-mode .tab.active { background: var(--wbso); border-color: var(--wbso);
     margin-left: 6px;
     font-weight: 800;
 }
+/* Clickable filter chips on Existing Hours summary -- click DNB / RIVM
+   to narrow the list, then Select All + Delete to bulk-remove. */
+.hours-filter-pill {
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: filter 0.12s ease, border-color 0.12s ease, transform 0.05s ease;
+    font: inherit;
+}
+.hours-filter-pill:hover { filter: brightness(1.1); }
+.hours-filter-pill:active { transform: translateY(1px); }
+.hours-filter-pill.is-active {
+    border-color: var(--text, #fff);
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.12);
+}
 
 /* Diff modal: Fix button (resolve conflict in-place) */
 .diff-action { white-space: nowrap; text-align: right; padding: 4px 8px; }

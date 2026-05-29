@@ -501,19 +501,24 @@ function renderHoursList() {
     }
     summaryHtml += '</div>';
 
-    // Per-project breakdown (DNB / RIVM / ...)
+    // Per-project breakdown (DNB / RIVM / ...). Pills act as click-to-filter
+    // chips: clicking one hides all entries from other projects so the user
+    // can Select All + Delete only that project's rows in one motion.
     var projectKeys = Object.keys(projectMap);
     if (projectKeys.length > 0) {
-        var pillsHtml = '<div class="hours-project-summary">';
+        var pillsHtml = '<div class="hours-project-summary" id="hoursProjectFilters">';
+        var allActive = !appState.hoursProjectFilter ? ' is-active' : '';
+        pillsHtml += '<button type="button" class="hour-entry-pill hours-filter-pill hour-entry-pill-unknown' + allActive + '" data-filter="_all">All<strong>' + totalHours.toFixed(1) + 'h</strong></button>';
         projectKeys.forEach(function(pid) {
             var info = projectMap[pid];
             var matchJob = (appState.jobs || []).find(function(j) {
                 return j.projectId && String(j.projectId) === String(pid);
             });
+            var active = (appState.hoursProjectFilter === String(pid)) ? ' is-active' : '';
             if (matchJob) {
-                pillsHtml += '<span class="hour-entry-pill" style="background:' + escapeHtml(matchJob.color || '#64748b') + ';">' + escapeHtml(matchJob.name) + '<strong>' + info.hours.toFixed(1) + 'h</strong></span>';
+                pillsHtml += '<button type="button" class="hour-entry-pill hours-filter-pill' + active + '" data-filter="' + escapeHtml(String(pid)) + '" style="background:' + escapeHtml(matchJob.color || '#64748b') + ';">' + escapeHtml(matchJob.name) + '<strong>' + info.hours.toFixed(1) + 'h</strong></button>';
             } else {
-                pillsHtml += '<span class="hour-entry-pill hour-entry-pill-unknown">' + escapeHtml(info.name) + '<strong>' + info.hours.toFixed(1) + 'h</strong></span>';
+                pillsHtml += '<button type="button" class="hour-entry-pill hours-filter-pill hour-entry-pill-unknown' + active + '" data-filter="' + escapeHtml(String(pid)) + '">' + escapeHtml(info.name) + '<strong>' + info.hours.toFixed(1) + 'h</strong></button>';
             }
         });
         pillsHtml += '</div>';
@@ -582,7 +587,9 @@ function renderHoursList() {
             projectPill = '<span class="hour-entry-pill hour-entry-pill-unknown">' + escapeHtml(entry.project.name) + '</span>';
         }
 
-        return '<div class="hour-entry">' +
+        var rowProjectId = entryProjId != null ? String(entryProjId) : '_none';
+        var rowHidden = (appState.hoursProjectFilter && appState.hoursProjectFilter !== rowProjectId) ? ' style="display:none;"' : '';
+        return '<div class="hour-entry" data-project="' + escapeHtml(rowProjectId) + '"' + rowHidden + '>' +
             '<input type="checkbox" data-idx="' + idx + '"' + (isLocked ? ' title="Linked to invoice - cannot delete"' : '') + '>' +
             '<div class="hour-entry-info">' +
                 '<div class="hour-entry-date">' + projectPill + formatEntryDate(entry.started_at) + ' &nbsp; ' + formatTimeRange(entry.started_at, entry.ended_at) + ' &nbsp; <strong>' + hours.toFixed(1) + 'h</strong>' + lockIcon + '</div>' +
@@ -590,6 +597,30 @@ function renderHoursList() {
             '</div>' +
         '</div>';
     }).join('');
+
+    // Wire up the filter pills (delegated click).
+    var filterBar = document.getElementById('hoursProjectFilters');
+    if (filterBar) {
+        filterBar.addEventListener('click', function(ev) {
+            var btn = ev.target.closest('.hours-filter-pill');
+            if (!btn) return;
+            var filter = btn.dataset.filter;
+            appState.hoursProjectFilter = (filter === '_all') ? null : filter;
+            // Toggle active state on pills.
+            filterBar.querySelectorAll('.hours-filter-pill').forEach(function(b) { b.classList.remove('is-active'); });
+            btn.classList.add('is-active');
+            // Show / hide rows.
+            list.querySelectorAll('.hour-entry').forEach(function(row) {
+                var match = (!appState.hoursProjectFilter) || (row.dataset.project === appState.hoursProjectFilter);
+                row.style.display = match ? '' : 'none';
+                if (!match) {
+                    var cb = row.querySelector('input[type="checkbox"]');
+                    if (cb) cb.checked = false;
+                }
+            });
+            updateHoursCount();
+        });
+    }
 
     updateHoursCount();
 }
@@ -602,7 +633,13 @@ function updateHoursCount() {
 }
 
 function selectAllHours() {
-    document.querySelectorAll('#hoursList input').forEach(cb => cb.checked = true);
+    // Respect the active project filter -- only check visible rows so users
+    // can filter by DNB / RIVM and bulk-delete just that subset.
+    document.querySelectorAll('#hoursList .hour-entry').forEach(function(row) {
+        if (row.style.display === 'none') return;
+        var cb = row.querySelector('input[type="checkbox"]');
+        if (cb) cb.checked = true;
+    });
     updateHoursCount();
 }
 
@@ -2362,4 +2399,3 @@ function showNewInvoiceModal(contacts, jobs) {
         };
     });
 }
-
