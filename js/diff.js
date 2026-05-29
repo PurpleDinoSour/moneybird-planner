@@ -334,6 +334,12 @@
             document.getElementById('diffModalBody').innerHTML = renderRows(newDiff.entries);
             paintCalendarOverlay(newDiff);
             window.__diffPlanned = planned;
+            // Keep the toolbar auto-diff badge in sync: its per-month cache
+            // would otherwise serve stale pre-fix counts for up to 60s.
+            if (window.autoDiff) {
+                window.autoDiff.invalidate(config.adminId, monthKey);
+                window.autoDiff.runNow();
+            }
         } catch (e) {
             console.error('[fix] refresh failed:', e);
         }

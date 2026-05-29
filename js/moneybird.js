@@ -1385,6 +1385,13 @@ async function freeOrphanInvoiceEntries(invIdx) {
         });
         if (resp.ok || resp.status === 204) {
             alert('Invoice deleted. ' + entryCount + ' time entr' + (entryCount === 1 ? 'y is' : 'ies are') + ' now open.');
+            // Toolbar auto-diff badge caches the month for 60s; freed entries
+            // would otherwise still appear linked until the cache expires.
+            if (window.autoDiff) {
+                var mk = document.getElementById('monthPicker') && document.getElementById('monthPicker').value;
+                window.autoDiff.invalidate(config.adminId, mk);
+                window.autoDiff.runNow();
+            }
             fetchConceptInvoices();
         } else {
             var errText = await resp.text();
