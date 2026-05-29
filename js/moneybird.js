@@ -481,7 +481,7 @@ function renderHoursList() {
         if (!dayMap[dateKey]) dayMap[dateKey] = { hours: 0, count: 0 };
         dayMap[dateKey].hours += hours;
         dayMap[dateKey].count++;
-        if (entry.events && entry.events.some(function(ev) { return ev.action === 'time_entry_invoice_added'; })) {
+        if (entry.sales_invoice_id || entry.invoice_id || entry.purchase_invoice_id) {
             lockedCount++;
         }
         var pid = entry.project_id || (entry.project && entry.project.id) || '_none';
@@ -567,7 +567,7 @@ function renderHoursList() {
     // Render entries grouped by date
     list.innerHTML = summaryHtml + appState.fetchedEntries.map(function(entry, idx) {
         var hours = parseEntryHours(entry);
-        var isLocked = entry.events && entry.events.some(function(ev) { return ev.action === 'time_entry_invoice_added'; });
+        var isLocked = !!(entry.sales_invoice_id || entry.invoice_id || entry.purchase_invoice_id);
         var lockIcon = isLocked ? ' 🔒' : '';
 
         // Match the entry's project to one of our configured jobs so we can
@@ -657,15 +657,14 @@ async function deleteSelectedHours() {
         return;
     }
 
-    // Pre-flight: any entry with a time_entry_invoice_added event is locked
-    // to a sales/purchase invoice and Moneybird will refuse the DELETE with
-    // 422 cannot_destroy. Warn the user up front so they don't think the
-    // app silently failed.
+    // Pre-flight lock check. Trust authoritative MB fields, NOT entry.events --
+    // events[] is a historical log, so a freed entry still carries an old
+    // time_entry_invoice_added event and would be skipped forever.
     var lockedEntries = [];
     var deletable = [];
     selected.forEach(function(idx) {
         var entry = appState.fetchedEntries[idx];
-        var locked = entry && entry.events && entry.events.some(function(ev) { return ev.action === 'time_entry_invoice_added'; });
+        var locked = !!(entry && (entry.sales_invoice_id || entry.invoice_id || entry.purchase_invoice_id));
         if (locked) { lockedEntries.push(entry); } else { deletable.push(entry); }
     });
 
