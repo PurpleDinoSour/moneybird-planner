@@ -657,12 +657,38 @@ async function deleteSelectedHours() {
         return;
     }
 
-    if (!confirm(`Delete ${selected.length} time entries? This cannot be undone.`)) return;
+    // Pre-flight: any entry with a time_entry_invoice_added event is locked
+    // to a sales/purchase invoice and Moneybird will refuse the DELETE with
+    // 422 cannot_destroy. Warn the user up front so they don't think the
+    // app silently failed.
+    var lockedEntries = [];
+    var deletable = [];
+    selected.forEach(function(idx) {
+        var entry = appState.fetchedEntries[idx];
+        var locked = entry && entry.events && entry.events.some(function(ev) { return ev.action === 'time_entry_invoice_added'; });
+        if (locked) { lockedEntries.push(entry); } else { deletable.push(entry); }
+    });
 
-    let success = 0, failed = 0, invoiceLocked = 0;
-    for (const idx of selected) {
+    if (deletable.length === 0) {
+        alert(
+            selected.length + ' selected entries are ALL locked to an invoice.\n\n' +
+            'Moneybird will not let you delete time entries that are on a sales invoice (concept or sent).\n\n' +
+            'Open Concept Invoices, delete the invoice shell first (this frees the time entries), then try again.'
+        );
+        return;
+    }
+
+    var confirmMsg = 'Delete ' + deletable.length + ' time entr' + (deletable.length === 1 ? 'y' : 'ies') + ' from Moneybird? This cannot be undone.';
+    if (lockedEntries.length > 0) {
+        confirmMsg += '\n\n' + lockedEntries.length + ' selected entr' + (lockedEntries.length === 1 ? 'y is' : 'ies are') +
+            ' locked to an invoice and will be SKIPPED. Delete the invoice in Concept Invoices first to free them.';
+    }
+    if (!confirm(confirmMsg)) return;
+
+    let success = 0, failed = 0, invoiceLocked = lockedEntries.length;
+    var failures = [];
+    for (const entry of deletable) {
         try {
-            const entry = appState.fetchedEntries[idx];
             const response = await fetch(`${CONFIG.API_BASE_URL}/moneybird/${config.adminId}/time_entries/${entry.id}`, {
                 method: 'DELETE',
                 headers: { 'X-Moneybird-Token': config.token }
@@ -672,23 +698,42 @@ async function deleteSelectedHours() {
                 success++;
             } else {
                 const errBody = await response.json().catch(function() { return {}; });
-                if (errBody.symbolic && (errBody.symbolic.id === 'cannot_destroy' || errBody.symbolic.id === 'forbidden')) {
+                var sym = errBody.symbolic && errBody.symbolic.id;
+                if (sym === 'cannot_destroy' || sym === 'forbidden') {
                     invoiceLocked++;
+                    failures.push(entry.id + ': locked (' + sym + ')');
                 } else {
                     failed++;
+                    failures.push(entry.id + ': HTTP ' + response.status + ' ' + (errBody.error || sym || JSON.stringify(errBody)));
                 }
+                console.warn('[deleteSelectedHours] DELETE failed for time_entry', entry.id, response.status, errBody);
             }
         } catch (err) {
             console.error('Delete failed:', err);
             failed++;
+            failures.push((entry && entry.id) + ': ' + err.message);
         }
     }
 
-    let msg = '';
-    if (success > 0) msg += `Deleted ${success} entries. `;
-    if (invoiceLocked > 0) msg += `${invoiceLocked} entries are linked to an invoice — use the Concept Invoices button to detach them first. `;
-    if (failed > 0) msg += `${failed} failed for other reasons.`;
+    var msg = '';
+    if (success > 0) msg += 'Deleted ' + success + ' entries.\n';
+    if (invoiceLocked > 0) msg += invoiceLocked + ' entries are linked to an invoice -- delete the invoice in Concept Invoices first to free them.\n';
+    if (failed > 0) msg += failed + ' failed for other reasons (see console).\n';
+    if (failures.length > 0) {
+        msg += '\nDetails:\n' + failures.slice(0, 10).join('\n');
+        if (failures.length > 10) msg += '\n(+' + (failures.length - 10) + ' more in console)';
+    }
     alert(msg.trim());
+
+    // Invalidate auto-diff cache so the badge reflects the new state.
+    if (window.autoDiff) {
+        try {
+            var picker = document.getElementById('monthPicker').value;
+            if (picker) window.autoDiff.invalidate(config.adminId, picker);
+            window.autoDiff.runNow();
+        } catch (_) { /* non-fatal */ }
+    }
+
     fetchExistingHours();
 }
 
