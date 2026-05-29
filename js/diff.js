@@ -252,6 +252,93 @@
         ].join('');
     }
 
+    // Apply the conflict-resolution mutations for a single row WITHOUT any
+    // confirms, alerts, or re-render. Returns counters so callers can batch
+    // and report once. PATCH-updates the primary matching entry to preserve
+    // the invoice link; DELETEs duplicate same-project entries when possible.
+    async function applyConflictFix(row, config) {
+        const out = { patched: false, patchFailed: 0, deleted: 0, locked: 0, delFailed: 0 };
+        const matches = (row.matches && row.matches.length) ? row.matches : (row.match ? [row.match] : []);
+        if (matches.length === 0) return out;
+
+        const plannedDescNorm = String(row.description || '').trim().toLowerCase().replace(/\s+/g, ' ');
+        let primary = matches.find(function (m) {
+            return String(m.description || '').trim().toLowerCase().replace(/\s+/g, ' ') === plannedDescNorm;
+        }) || matches[0];
+        const extras = matches.filter(function (m) { return m.id !== primary.id; });
+
+        try {
+            const pausedDuration = row.lunch ? 3600 : 0;
+            const payload = {
+                time_entry: {
+                    started_at: row.date + ' ' + (row.startTime || '09:00'),
+                    ended_at:   row.date + ' ' + (row.endTime   || '17:00'),
+                    description: row.description,
+                    paused_duration: pausedDuration
+                }
+            };
+            if (row.projectId) payload.time_entry.project_id = row.projectId;
+            const resp = await fetch(CONFIG.API_BASE_URL + '/moneybird/' + config.adminId + '/time_entries/' + primary.id, {
+                method: 'PATCH',
+                headers: {
+                    'X-Moneybird-Token': config.token,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
+            if (resp.ok) {
+                out.patched = true;
+            } else {
+                out.patchFailed++;
+                console.error('[fix] PATCH ' + primary.id + ' -> ' + resp.status, await resp.text());
+            }
+        } catch (e) {
+            out.patchFailed++;
+            console.error('[fix] patch failed:', e);
+        }
+
+        for (const m of extras) {
+            try {
+                const resp = await fetch(CONFIG.API_BASE_URL + '/moneybird/' + config.adminId + '/time_entries/' + m.id, {
+                    method: 'DELETE',
+                    headers: { 'X-Moneybird-Token': config.token }
+                });
+                if (resp.ok || resp.status === 204) {
+                    out.deleted++;
+                } else {
+                    const body = await resp.json().catch(() => ({}));
+                    if (body.symbolic && (body.symbolic.id === 'cannot_destroy' || body.symbolic.id === 'forbidden')) {
+                        out.locked++;
+                    } else {
+                        out.delFailed++;
+                    }
+                }
+            } catch (e) {
+                console.error('[fix] delete duplicate failed:', e);
+                out.delFailed++;
+            }
+        }
+        return out;
+    }
+
+    // Re-fetch existing entries and re-render the modal summary + rows. Used
+    // by both single-row and batch fix flows so the modal always reflects
+    // Moneybird's actual state after mutations.
+    async function refreshDiffModal(config, allPlannedEntries) {
+        try {
+            const monthKey = document.getElementById('monthPicker').value;
+            const fresh = await fetchMonthEntries(config, monthKey);
+            const planned = allPlannedEntries || [];
+            const newDiff = computeDiff(planned, fresh);
+            document.getElementById('diffModalSummary').innerHTML = renderSummary(newDiff.summary);
+            document.getElementById('diffModalBody').innerHTML = renderRows(newDiff.entries);
+            paintCalendarOverlay(newDiff);
+            window.__diffPlanned = planned;
+        } catch (e) {
+            console.error('[fix] refresh failed:', e);
+        }
+    }
+
     // Resolve a single conflict row by index into lastRendered.
     // Strategy: PATCH the primary existing entry's started_at/ended_at/
     // description so the calendar correction propagates to Moneybird WITHOUT
@@ -274,9 +361,8 @@
         const matches = (row.matches && row.matches.length) ? row.matches : (row.match ? [row.match] : []);
         if (matches.length === 0) return;
 
-        // Pick the primary match: prefer same description, else first.
         const plannedDescNorm = String(row.description || '').trim().toLowerCase().replace(/\s+/g, ' ');
-        let primary = matches.find(function (m) {
+        const primary = matches.find(function (m) {
             return String(m.description || '').trim().toLowerCase().replace(/\s+/g, ' ') === plannedDescNorm;
         }) || matches[0];
         const extras = matches.filter(function (m) { return m.id !== primary.id; });
@@ -287,93 +373,82 @@
             + '\nThe invoice link on the primary entry is preserved; the concept invoice will reflect the new hours.\n\nContinue?';
         if (!confirm(msg)) return;
 
-        // ---- PATCH primary entry --------------------------------------
-        let patched = false;
-        try {
-            const lunch = !!row.lunch;
-            const pausedDuration = lunch ? 3600 : 0;
-            const payload = {
-                time_entry: {
-                    started_at: row.date + ' ' + (row.startTime || '09:00'),
-                    ended_at:   row.date + ' ' + (row.endTime   || '17:00'),
-                    description: row.description,
-                    paused_duration: pausedDuration
-                }
-            };
-            if (row.projectId) payload.time_entry.project_id = row.projectId;
-            const resp = await fetch(CONFIG.API_BASE_URL + '/moneybird/' + config.adminId + '/time_entries/' + primary.id, {
-                method: 'PATCH',
-                headers: {
-                    'X-Moneybird-Token': config.token,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(payload)
-            });
-            if (resp.ok) {
-                patched = true;
-            } else {
-                const errText = await resp.text();
-                alert('Could not update existing entry (' + resp.status + '):\n' + errText);
-            }
-        } catch (e) {
-            console.error('[fix] patch failed:', e);
-            alert('Could not update existing entry: ' + e.message);
+        const r = await applyConflictFix(row, config);
+
+        if (r.patchFailed > 0) {
+            alert('Could not update existing entry. Check console for the Moneybird response.');
+        }
+        if (r.locked > 0 || r.delFailed > 0) {
+            alert('Duplicates: ' + r.deleted + ' deleted, ' + r.locked + ' locked (linked to invoice), ' + r.delFailed + ' failed.\n\nLocked duplicates must be freed via the invoice (use "Free entries" on its draft invoice, or detach the relevant line).');
         }
 
-        // ---- DELETE duplicates ----------------------------------------
-        let deleted = 0, locked = 0, delFailed = 0;
-        for (const m of extras) {
-            try {
-                const resp = await fetch(CONFIG.API_BASE_URL + '/moneybird/' + config.adminId + '/time_entries/' + m.id, {
-                    method: 'DELETE',
-                    headers: { 'X-Moneybird-Token': config.token }
-                });
-                if (resp.ok || resp.status === 204) {
-                    deleted++;
-                } else {
-                    const body = await resp.json().catch(() => ({}));
-                    if (body.symbolic && (body.symbolic.id === 'cannot_destroy' || body.symbolic.id === 'forbidden')) {
-                        locked++;
-                    } else {
-                        delFailed++;
-                    }
-                }
-            } catch (e) {
-                console.error('[fix] delete duplicate failed:', e);
-                delFailed++;
-            }
-        }
-
-        if (locked > 0 || delFailed > 0) {
-            alert('Duplicates: ' + deleted + ' deleted, ' + locked + ' locked (linked to invoice), ' + delFailed + ' failed.\n\nLocked duplicates must be freed via the invoice (use "Free entries" on its draft invoice, or detach the relevant line).');
-        }
-
-        if (!patched && extras.length === 0) {
-            // Nothing happened.
+        if (!r.patched && extras.length === 0) {
             return;
         }
-        // Re-fetch + re-classify so the modal reflects the new state.
-        try {
-            const monthKey = document.getElementById('monthPicker').value;
-            const fresh = await fetchMonthEntries(config, monthKey);
-            const planned = allPlannedEntries || [];
-            const newDiff = computeDiff(planned, fresh);
-            document.getElementById('diffModalSummary').innerHTML = renderSummary(newDiff.summary);
-            document.getElementById('diffModalBody').innerHTML = renderRows(newDiff.entries);
-            paintCalendarOverlay(newDiff);
-            window.__diffPlanned = planned;
-        } catch (e) {
-            console.error('[fix] refresh failed:', e);
+        await refreshDiffModal(config, allPlannedEntries);
+    }
+
+    // Batch resolution: walk every conflict row currently rendered and apply
+    // the same PATCH-primary + DELETE-duplicates strategy. One confirm up
+    // front, one summary alert at the end, one modal refresh. Buttons are
+    // disabled during the run so the user can't trigger overlapping fixes.
+    async function fixAllConflicts(allPlannedEntries) {
+        if (typeof getCurrentConfig !== 'function') {
+            alert('Moneybird helpers not loaded.');
+            return;
         }
+        const config = getCurrentConfig();
+        if (!config.token || !config.adminId) {
+            alert('Configure Moneybird API first.');
+            return;
+        }
+        const conflicts = lastRendered.filter(function (r) { return r.status === 'conflict'; });
+        if (conflicts.length === 0) {
+            alert('No conflicts to fix.');
+            return;
+        }
+        if (!confirm('Fix all ' + conflicts.length + ' conflict(s)?\n\nEach existing Moneybird entry is updated (PATCH) to match the planned hours/description; duplicates on the same project+date are deleted when possible. Invoice links are preserved.')) {
+            return;
+        }
+        // Lock the UI during the batch.
+        const allBtns = document.querySelectorAll('#diffModalBody .diff-fix-btn, #diffFixAllBtn');
+        allBtns.forEach(function (b) { b.disabled = true; });
+        const fixAllBtn = document.getElementById('diffFixAllBtn');
+
+        let patched = 0, patchFailed = 0, deleted = 0, locked = 0, delFailed = 0;
+        for (let i = 0; i < conflicts.length; i++) {
+            if (fixAllBtn) fixAllBtn.textContent = 'Fixing ' + (i + 1) + ' / ' + conflicts.length + '...';
+            const out = await applyConflictFix(conflicts[i], config);
+            if (out.patched) patched++;
+            patchFailed += out.patchFailed;
+            deleted += out.deleted;
+            locked  += out.locked;
+            delFailed += out.delFailed;
+        }
+
+        const lines = [
+            patched   + ' updated',
+            patchFailed > 0 ? patchFailed + ' update failed' : null,
+            deleted   + ' duplicate(s) deleted',
+            locked    > 0 ? locked    + ' duplicate(s) locked (invoice)' : null,
+            delFailed > 0 ? delFailed + ' duplicate(s) delete failed'    : null
+        ].filter(Boolean);
+        alert('Fix all complete:\n\n' + lines.join('\n'));
+
+        await refreshDiffModal(config, allPlannedEntries);
     }
 
     function renderSummary(summary) {
-        return [
+        const parts = [
             '<span class="diff-stat diff-stat-new"><strong>' + summary.new + '</strong> new</span>',
             '<span class="diff-stat diff-stat-existing"><strong>' + summary.existing + '</strong> already in Moneybird</span>',
-            '<span class="diff-stat diff-stat-conflict"><strong>' + summary.conflict + '</strong> conflict</span>',
-            '<span class="diff-stat-total">Total planned: <strong>' + summary.total + '</strong></span>'
-        ].join('');
+            '<span class="diff-stat diff-stat-conflict"><strong>' + summary.conflict + '</strong> conflict</span>'
+        ];
+        if (summary.conflict > 0) {
+            parts.push('<button type="button" id="diffFixAllBtn" class="diff-fix-btn" title="Update every existing Moneybird entry to match the plan; delete duplicates where possible. Invoice links preserved.">Fix all (' + summary.conflict + ')</button>');
+        }
+        parts.push('<span class="diff-stat-total">Total planned: <strong>' + summary.total + '</strong></span>');
+        return parts.join('');
     }
 
     // Show the modal and return a promise that resolves to:
@@ -424,6 +499,21 @@
                 fixConflict(idx, window.__diffPlanned).catch(e => console.error(e));
             });
             body.__fixHandlerBound = true;
+        }
+        // Delegated click handler for the Fix all button. Summary is
+        // re-rendered after every refresh so we bind on the container, not
+        // the button itself.
+        const summaryEl = document.getElementById('diffModalSummary');
+        if (summaryEl && !summaryEl.__fixAllHandlerBound) {
+            summaryEl.addEventListener('click', function (ev) {
+                const btn = ev.target.closest('#diffFixAllBtn');
+                if (!btn) return;
+                ev.preventDefault();
+                btn.disabled = true;
+                btn.textContent = 'Fixing...';
+                fixAllConflicts(window.__diffPlanned).catch(e => console.error(e));
+            });
+            summaryEl.__fixAllHandlerBound = true;
         }
         const confirmBtn = document.getElementById('diffModalConfirm');
         if (diff.summary.new === 0) {
