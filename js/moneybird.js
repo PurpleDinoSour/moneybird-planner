@@ -171,9 +171,9 @@ async function registerStandard(config, baseDesc, wbsoComment, matchCommitsToDat
     // Pull existing month entries silently and show a NEW/EXISTING/CONFLICT
     // preview modal instead of a flat confirm().
     let toRegister = entries;
+    let existing = null;
     if (window.diffEngine) {
         const monthKey = document.getElementById('monthPicker').value;
-        let existing = [];
         try {
             existing = await window.diffEngine.fetchMonthEntries(config, monthKey);
         } catch (e) {
@@ -188,12 +188,61 @@ async function registerStandard(config, baseDesc, wbsoComment, matchCommitsToDat
             if (toRegister.length === 0) return;
         } else {
             // Fallback to old confirm flow if Moneybird is unreachable.
-            var confirmMsg = 'Register ' + entries.length + ' time entries across ' + dates.length + ' days?';
-            if (!confirm(confirmMsg)) return;
+            // SAFETY: refuse to proceed without an existing-entries snapshot.
+            // Silently POSTing here is exactly how duplicate entries get
+            // created (e.g. a 4h entry on top of an existing 8h entry).
+            alert('Cannot reach Moneybird to check for existing entries.\n\n' +
+                  'Registration aborted to prevent duplicates. Please retry once the connection is restored.');
+            return;
         }
     } else {
         var confirmMsg = 'Register ' + entries.length + ' time entries across ' + dates.length + ' days?';
         if (!confirm(confirmMsg)) return;
+    }
+
+    // ---- HARD DUPLICATE GUARD ----
+    // Final safety net: even if the diff classified an entry as `new`, refuse
+    // to POST it when an existing Moneybird entry already covers the same
+    // (date, project). Catches: stale cache, missing project_id on existing
+    // entries, description-template drift, and any future diff regressions.
+    if (existing && existing.length > 0) {
+        var existingByDateProj = {};
+        existing.forEach(function (e) {
+            if (!e || !e.started_at) return;
+            var d = String(e.started_at).match(/^(\d{4}-\d{2}-\d{2})/);
+            if (!d) return;
+            var pid = e.project_id || (e.project && e.project.id) || '';
+            var key = d[1] + '|' + String(pid);
+            (existingByDateProj[key] = existingByDateProj[key] || []).push(e);
+        });
+        var blocked = [];
+        var safe = [];
+        toRegister.forEach(function (entry) {
+            var key = entry.date + '|' + String(entry.projectId || '');
+            if (existingByDateProj[key] && existingByDateProj[key].length > 0) {
+                blocked.push(entry);
+            } else {
+                safe.push(entry);
+            }
+        });
+        if (blocked.length > 0) {
+            var lines = blocked.slice(0, 10).map(function (b) {
+                return '  - ' + b.date + ' ' + (b.jobName || '') + ' (' + (b.startTime || '?') + '-' + (b.endTime || '?') + ')';
+            });
+            if (blocked.length > 10) lines.push('  ... and ' + (blocked.length - 10) + ' more');
+            var msg = 'DUPLICATE GUARD: ' + blocked.length + ' entr' + (blocked.length === 1 ? 'y' : 'ies')
+                + ' would duplicate existing Moneybird registrations on the same date + project:\n\n'
+                + lines.join('\n')
+                + '\n\nThese will be SKIPPED. ' + (safe.length > 0
+                    ? 'Continue with the remaining ' + safe.length + ' safe entr' + (safe.length === 1 ? 'y' : 'ies') + '?'
+                    : 'Nothing left to register.');
+            if (safe.length === 0) {
+                alert(msg);
+                return;
+            }
+            if (!confirm(msg)) return;
+            toRegister = safe;
+        }
     }
 
     let success = 0, failed = 0;
@@ -1252,6 +1301,14 @@ async function loadInvoiceLinkedEntries(idx) {
         });
         var summary = '<div class="invoice-linked-summary">';
         summary += '<strong>' + entries.length + ' time entr' + (entries.length === 1 ? 'y' : 'ies') + '</strong> &middot; ' + totalH.toFixed(1) + 'h total';
+        // Free-entries shortcut: only safe when the invoice has 0 detail lines
+        // (orphan state). Moneybird does not allow clearing sales_invoice_id
+        // via time_entry PATCH (returns 400 forbidden), so the only supported
+        // way to free the entries is to delete the empty invoice shell.
+        var detailCount = (inv.details && inv.details.length) || 0;
+        if (detailCount === 0) {
+            summary += ' <button class="btn btn-sm btn-danger" style="margin-left:8px;" onclick="freeOrphanInvoiceEntries(' + idx + ')" title="Delete this empty invoice so its linked time entries return to open state">Free entries (delete empty invoice)</button>';
+        }
         Object.keys(byProject).forEach(function(k) {
             var p = byProject[k];
             var style = p.color ? ' style="background:' + p.color + ';"' : '';
@@ -1296,7 +1353,48 @@ async function loadInvoiceLinkedEntries(idx) {
     }
 }
 
-// Show 'qty -> 140.0', 'EUR 0.00 -> 107.50', 'N (preview)' on each unbilled line
+// Free the time entries linked to an orphan-state draft invoice (no detail
+// lines, just dangling linked entries). Moneybird's API does not allow
+// clearing sales_invoice_id via a time_entry PATCH (returns 400 forbidden),
+// so the only supported path is to delete the empty invoice shell -- which
+// cascades and returns every linked entry to state:open. Guarded to refuse
+// when the invoice still carries detail lines: those must be removed via the
+// per-line detach flow first.
+async function freeOrphanInvoiceEntries(invIdx) {
+    var inv = appState.conceptInvoices[invIdx];
+    if (!inv) return;
+    var detailCount = (inv.details && inv.details.length) || 0;
+    if (detailCount > 0) {
+        alert('This invoice still has ' + detailCount + ' detail line(s).\n\nRemove the lines first (tick them above and use the detach action), or use Delete Invoice on the invoice header.');
+        return;
+    }
+    var entryCount = (inv.__linkedEntries && inv.__linkedEntries.length) || 0;
+    if (entryCount === 0) {
+        alert('No linked time entries to free.');
+        return;
+    }
+    var contactName = (inv.contact && inv.contact.company_name) ? inv.contact.company_name : 'Unknown';
+    if (!confirm('Delete the empty draft invoice for ' + contactName + ' and free its ' + entryCount + ' linked time entr' + (entryCount === 1 ? 'y' : 'ies') + '?\n\nThis is the Moneybird-supported way to clear a linked-but-empty draft; the time entries return to open state and can then be edited or deleted.')) {
+        return;
+    }
+    var config = getCurrentConfig();
+    try {
+        var resp = await fetch(CONFIG.API_BASE_URL + '/moneybird/' + config.adminId + '/sales_invoices/' + inv.id, {
+            method: 'DELETE',
+            headers: { 'X-Moneybird-Token': config.token }
+        });
+        if (resp.ok || resp.status === 204) {
+            alert('Invoice deleted. ' + entryCount + ' time entr' + (entryCount === 1 ? 'y is' : 'ies are') + ' now open.');
+            fetchConceptInvoices();
+        } else {
+            var errText = await resp.text();
+            alert('Failed to delete invoice: ' + resp.status + '\n' + errText);
+        }
+    } catch (err) {
+        alert('Error deleting invoice: ' + err.message);
+    }
+}
+
 // of an invoice once we have its linked time entries cached.
 function annotateInvoiceLinesWithPreview(idx) {
     var inv = appState.conceptInvoices[idx];
