@@ -2067,3 +2067,299 @@ async function deleteConceptInvoice(invIdx) {
         alert('Error deleting invoice: ' + err.message);
     }
 }
+
+// =====================================================================
+// NEW INVOICE WIZARD
+// ---------------------------------------------------------------------
+// Creates a fresh draft sales invoice in Moneybird with one detail line
+// per selected project (or one blank placeholder line). After creation
+// the user can immediately jump into the existing "Add hours" picker to
+// link open time entries -- the rest of the bill flow (auto-bill when
+// a single line, manual "Bill from linked hours" for multi-line) stays
+// unchanged. Default description uses the same template tokens as the
+// "Bill from linked hours" flow ({job} {month} {year} ...).
+// =====================================================================
+
+async function fetchContactsList(config, opts) {
+    opts = opts || {};
+    if (!opts.force && appState.contacts && appState.contacts.length > 0) {
+        return appState.contacts;
+    }
+    var all = [];
+    var page = 1;
+    var hasMore = true;
+    while (hasMore) {
+        var resp = await fetch(CONFIG.API_BASE_URL + '/moneybird/' + config.adminId + '/contacts?per_page=100&page=' + page, {
+            headers: { 'X-Moneybird-Token': config.token }
+        });
+        if (!resp.ok) throw new Error('Contacts API error: ' + resp.status);
+        var pageData = await resp.json();
+        all = all.concat(pageData);
+        hasMore = pageData.length === 100;
+        page++;
+        if (page > 50) break; // safety cap (5000 contacts)
+    }
+    appState.contacts = all;
+    return all;
+}
+
+function contactDisplayName(c) {
+    if (!c) return 'Unknown';
+    if (c.company_name) return c.company_name;
+    var fn = c.firstname || '';
+    var ln = c.lastname || '';
+    return (fn + ' ' + ln).trim() || ('Contact ' + (c.id || '?'));
+}
+
+async function createDraftInvoice(config, payload) {
+    var resp = await fetch(CONFIG.API_BASE_URL + '/moneybird/' + config.adminId + '/sales_invoices', {
+        method: 'POST',
+        headers: {
+            'X-Moneybird-Token': config.token,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ sales_invoice: payload })
+    });
+    if (!resp.ok) {
+        var errText = await resp.text();
+        throw new Error('Create failed: ' + resp.status + ' ' + errText);
+    }
+    return await resp.json();
+}
+
+async function openNewInvoiceWizard() {
+    var config = getCurrentConfig();
+    if (!config || !config.token || !config.adminId) {
+        alert('Please configure API settings first');
+        return;
+    }
+    var jobs = (window.appState && Array.isArray(appState.jobs)) ? appState.jobs : [];
+    if (jobs.length === 0) {
+        alert('No jobs configured. Add at least one job (project) under Settings -> Jobs first.');
+        return;
+    }
+
+    var contacts;
+    try {
+        contacts = await fetchContactsList(config);
+    } catch (err) {
+        alert('Could not load contacts: ' + err.message);
+        return;
+    }
+    if (!contacts || contacts.length === 0) {
+        alert('No contacts found in Moneybird.');
+        return;
+    }
+
+    var result = await showNewInvoiceModal(contacts, jobs);
+    if (!result) return;
+
+    // Build details_attributes: one line per selected project, blank if none.
+    var monthIso = (result.invoiceDate || '').substring(0, 10) || new Date().toISOString().substring(0, 10);
+    var details;
+    if (result.projectIds && result.projectIds.length > 0) {
+        details = result.projectIds.map(function(pid) {
+            var job = jobs.find(function(j) { return String(j.projectId || '') === String(pid); });
+            var jobName = job ? job.name : '';
+            return {
+                description: expandDescriptionTemplate(result.descriptionTemplate, monthIso, jobName),
+                amount: '0',
+                price: '0'
+            };
+        });
+    } else {
+        details = [{
+            description: expandDescriptionTemplate(result.descriptionTemplate, monthIso, contactDisplayName(result.contact)),
+            amount: '0',
+            price: '0'
+        }];
+    }
+
+    var payload = {
+        contact_id: String(result.contact.id),
+        invoice_date: monthIso,
+        reference: result.reference || '',
+        details_attributes: details
+    };
+
+    var newInvoice;
+    try {
+        newInvoice = await createDraftInvoice(config, payload);
+    } catch (err) {
+        alert('Failed to create invoice: ' + err.message);
+        return;
+    }
+
+    // Remember the project<->contact mapping so future "Add hours" auto-checks.
+    if (result.projectIds && result.projectIds.length > 0) {
+        rememberInvoiceProjects(String(result.contact.id), result.projectIds.map(String));
+    }
+
+    // Refresh list, locate the new invoice, expand it, and offer to add hours.
+    await fetchConceptInvoices();
+    var newIdx = (appState.conceptInvoices || []).findIndex(function(x) { return x.id === newInvoice.id; });
+    if (newIdx >= 0) {
+        if (typeof toggleInvoiceDetails === 'function') toggleInvoiceDetails(newIdx);
+        if (window.autoDiff && window.autoDiff.runNow) { try { window.autoDiff.runNow(); } catch (e) {} }
+        if (confirm('Draft invoice created for "' + contactDisplayName(result.contact) + '".\n\nOpen the "Add hours" picker now to link open time entries?')) {
+            linkHoursToInvoice(newIdx);
+        }
+    } else {
+        alert('Invoice created, but it did not appear in the list (it may belong to another month -- enable "Show all months").');
+    }
+}
+
+// Single-screen wizard modal. Returns Promise<{contact, projectIds, invoiceDate, reference, descriptionTemplate}> or null.
+function showNewInvoiceModal(contacts, jobs) {
+    return new Promise(function(resolve) {
+        var overlay = document.createElement('div');
+        overlay.className = 'te-picker-overlay';
+
+        var modal = document.createElement('div');
+        modal.className = 'te-picker-modal';
+        modal.style.maxWidth = '720px';
+
+        var today = new Date();
+        var defaultDate = today.toISOString().substring(0, 10);
+        var defaultTemplate = 'Consultancy uren {month} {job}';
+
+        modal.innerHTML = [
+            '<h3 class="te-picker-title">Create draft invoice</h3>',
+            '<div class="te-picker-selectbar" style="flex-direction:column; align-items:stretch; gap:10px;">',
+            '  <label style="display:flex; flex-direction:column; gap:4px;">',
+            '    <span class="text-sm text-muted">Contact</span>',
+            '    <input type="text" id="newInvContactSearch" class="input" placeholder="Search broker / customer..." autocomplete="off" />',
+            '    <select id="newInvContactSelect" class="input" size="6" style="font-family:inherit;"></select>',
+            '  </label>',
+            '  <label style="display:flex; flex-direction:column; gap:4px;">',
+            '    <span class="text-sm text-muted">Invoice lines (one per project)</span>',
+            '    <div id="newInvProjects" style="display:flex; flex-wrap:wrap; gap:6px; padding:6px; border:1px solid var(--border); border-radius:6px; background:var(--bg-elevated);"></div>',
+            '    <span class="text-sm text-muted" style="font-size:11px;">Tip: previously linked projects for the selected contact are auto-checked. Leave all unchecked for a single blank placeholder line.</span>',
+            '  </label>',
+            '  <div style="display:flex; gap:10px;">',
+            '    <label style="flex:1; display:flex; flex-direction:column; gap:4px;">',
+            '      <span class="text-sm text-muted">Invoice date</span>',
+            '      <input type="date" id="newInvDate" class="input" value="' + defaultDate + '" />',
+            '    </label>',
+            '    <label style="flex:2; display:flex; flex-direction:column; gap:4px;">',
+            '      <span class="text-sm text-muted">Reference (optional)</span>',
+            '      <input type="text" id="newInvRef" class="input" placeholder="PO number, contract ref..." />',
+            '    </label>',
+            '  </div>',
+            '  <label style="display:flex; flex-direction:column; gap:4px;">',
+            '    <span class="text-sm text-muted">Line description template</span>',
+            '    <input type="text" id="newInvDescTpl" class="input" value="' + defaultTemplate + '" />',
+            '    <span class="text-sm text-muted" style="font-size:11px;">Tokens: {job} {customer} {month} {monthEn} {monthN} {year} {date}</span>',
+            '  </label>',
+            '</div>'
+        ].join('');
+
+        var btnRow = document.createElement('div');
+        btnRow.className = 'te-picker-actions';
+        var cancelBtn = document.createElement('button');
+        cancelBtn.textContent = 'Cancel';
+        cancelBtn.className = 'btn btn-ghost';
+        var createBtn = document.createElement('button');
+        createBtn.textContent = 'Create draft';
+        createBtn.className = 'btn btn-primary';
+        btnRow.appendChild(cancelBtn);
+        btnRow.appendChild(createBtn);
+        modal.appendChild(btnRow);
+
+        overlay.appendChild(modal);
+        document.body.appendChild(overlay);
+
+        var searchInput = modal.querySelector('#newInvContactSearch');
+        var selectEl = modal.querySelector('#newInvContactSelect');
+        var projectsEl = modal.querySelector('#newInvProjects');
+        var projectMap = getInvoiceProjectMap();
+
+        function renderContactOptions(filterText) {
+            var q = (filterText || '').trim().toLowerCase();
+            var filtered = contacts.filter(function(c) {
+                if (!q) return true;
+                return contactDisplayName(c).toLowerCase().indexOf(q) !== -1;
+            }).sort(function(a, b) {
+                return contactDisplayName(a).localeCompare(contactDisplayName(b));
+            });
+            selectEl.innerHTML = '';
+            filtered.slice(0, 200).forEach(function(c) {
+                var opt = document.createElement('option');
+                opt.value = String(c.id);
+                opt.textContent = contactDisplayName(c);
+                selectEl.appendChild(opt);
+            });
+            if (filtered.length === 0) {
+                var opt = document.createElement('option');
+                opt.disabled = true;
+                opt.textContent = '(no match)';
+                selectEl.appendChild(opt);
+            }
+        }
+
+        function renderProjectCheckboxes() {
+            projectsEl.innerHTML = '';
+            var selectedContactId = selectEl.value;
+            var remembered = projectMap[selectedContactId] || [];
+            jobs.forEach(function(job) {
+                if (!job.projectId) return;
+                var pid = String(job.projectId);
+                var id = 'newInvJob_' + pid;
+                var wrap = document.createElement('label');
+                wrap.style.cssText = 'display:inline-flex; align-items:center; gap:6px; padding:4px 8px; border:1px solid var(--border); border-radius:999px; cursor:pointer; background:var(--surface);';
+                var cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.value = pid;
+                cb.id = id;
+                cb.checked = remembered.indexOf(pid) !== -1;
+                var swatch = document.createElement('span');
+                swatch.style.cssText = 'display:inline-block; width:10px; height:10px; border-radius:50%; background:' + (job.color || '#888') + ';';
+                var txt = document.createElement('span');
+                txt.textContent = job.name;
+                wrap.appendChild(cb);
+                wrap.appendChild(swatch);
+                wrap.appendChild(txt);
+                projectsEl.appendChild(wrap);
+            });
+            if (projectsEl.children.length === 0) {
+                projectsEl.innerHTML = '<span class="text-sm text-muted" style="font-size:11px;">No jobs have a Moneybird project linked. A single blank line will be created.</span>';
+            }
+        }
+
+        renderContactOptions('');
+        renderProjectCheckboxes();
+        searchInput.addEventListener('input', function() { renderContactOptions(searchInput.value); });
+        selectEl.addEventListener('change', renderProjectCheckboxes);
+        // Auto-select first option as the user types.
+        searchInput.addEventListener('keyup', function() {
+            if (selectEl.options.length > 0 && !selectEl.value) {
+                selectEl.selectedIndex = 0;
+                renderProjectCheckboxes();
+            }
+        });
+
+        function done(result) {
+            document.body.removeChild(overlay);
+            resolve(result);
+        }
+        cancelBtn.onclick = function() { done(null); };
+        overlay.onclick = function(e) { if (e.target === overlay) done(null); };
+        createBtn.onclick = function() {
+            var cid = selectEl.value;
+            var contact = contacts.find(function(c) { return String(c.id) === String(cid); });
+            if (!contact) { alert('Select a contact first.'); return; }
+            var pickedProjects = [];
+            projectsEl.querySelectorAll('input[type="checkbox"]:checked').forEach(function(cb) {
+                pickedProjects.push(cb.value);
+            });
+            done({
+                contact: contact,
+                projectIds: pickedProjects,
+                invoiceDate: modal.querySelector('#newInvDate').value || defaultDate,
+                reference: modal.querySelector('#newInvRef').value || '',
+                descriptionTemplate: modal.querySelector('#newInvDescTpl').value || defaultTemplate
+            });
+        };
+    });
+}
+
