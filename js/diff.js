@@ -228,7 +228,7 @@
             if (r.status === 'conflict') {
                 const matchCount = (r.matches && r.matches.length) || (r.match ? 1 : 0);
                 const label = matchCount > 1 ? 'Fix (' + matchCount + ')' : 'Fix';
-                actionCell = '<td class="diff-action"><button type="button" class="diff-fix-btn" data-fix-idx="' + i + '" title="Delete existing entries on this project + register the planned one">' + label + '</button></td>';
+                actionCell = '<td class="diff-action"><button type="button" class="diff-fix-btn" data-fix-idx="' + i + '" title="Update existing Moneybird entry to match the planned hours (preserves invoice link); deletes any duplicates">' + label + '</button></td>';
             }
             return [
                 '<tr class="diff-row diff-row-' + r.status + '">',
@@ -253,8 +253,12 @@
     }
 
     // Resolve a single conflict row by index into lastRendered.
-    // Strategy: DELETE all matching existing entries on the same project + date
-    // (skip invoice-locked), then POST the planned entry.
+    // Strategy: PATCH the primary existing entry's started_at/ended_at/
+    // description so the calendar correction propagates to Moneybird WITHOUT
+    // breaking the invoice link (PATCHing those fields is allowed even on
+    // entries already attached to a draft invoice; DELETE is not). Any
+    // additional duplicate entries on the same project+date are then DELETEd
+    // when possible; invoice-locked duplicates are left alone with a warning.
     async function fixConflict(idx, allPlannedEntries) {
         const row = lastRendered[idx];
         if (!row || row.status !== 'conflict') return;
@@ -268,14 +272,57 @@
             return;
         }
         const matches = (row.matches && row.matches.length) ? row.matches : (row.match ? [row.match] : []);
+        if (matches.length === 0) return;
+
+        // Pick the primary match: prefer same description, else first.
+        const plannedDescNorm = String(row.description || '').trim().toLowerCase().replace(/\s+/g, ' ');
+        let primary = matches.find(function (m) {
+            return String(m.description || '').trim().toLowerCase().replace(/\s+/g, ' ') === plannedDescNorm;
+        }) || matches[0];
+        const extras = matches.filter(function (m) { return m.id !== primary.id; });
+
         const msg = 'Resolve conflict on ' + row.date + ' (' + (row.jobName || 'no job') + '):\n\n'
-            + '- Delete ' + matches.length + ' existing entr' + (matches.length === 1 ? 'y' : 'ies') + ' on this project\n'
-            + '- Register planned ' + (row.startTime || '') + '-' + (row.endTime || '') + '\n\n'
-            + 'Continue?';
+            + '- Update existing entry to ' + (row.startTime || '?') + '-' + (row.endTime || '?') + (row.lunch ? ' (lunch)' : '') + '\n'
+            + (extras.length > 0 ? '- Delete ' + extras.length + ' duplicate entr' + (extras.length === 1 ? 'y' : 'ies') + ' on the same project\n' : '')
+            + '\nThe invoice link on the primary entry is preserved; the concept invoice will reflect the new hours.\n\nContinue?';
         if (!confirm(msg)) return;
 
+        // ---- PATCH primary entry --------------------------------------
+        let patched = false;
+        try {
+            const lunch = !!row.lunch;
+            const pausedDuration = lunch ? 3600 : 0;
+            const payload = {
+                time_entry: {
+                    started_at: row.date + ' ' + (row.startTime || '09:00'),
+                    ended_at:   row.date + ' ' + (row.endTime   || '17:00'),
+                    description: row.description,
+                    paused_duration: pausedDuration
+                }
+            };
+            if (row.projectId) payload.time_entry.project_id = row.projectId;
+            const resp = await fetch(CONFIG.API_BASE_URL + '/moneybird/' + config.adminId + '/time_entries/' + primary.id, {
+                method: 'PATCH',
+                headers: {
+                    'X-Moneybird-Token': config.token,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
+            if (resp.ok) {
+                patched = true;
+            } else {
+                const errText = await resp.text();
+                alert('Could not update existing entry (' + resp.status + '):\n' + errText);
+            }
+        } catch (e) {
+            console.error('[fix] patch failed:', e);
+            alert('Could not update existing entry: ' + e.message);
+        }
+
+        // ---- DELETE duplicates ----------------------------------------
         let deleted = 0, locked = 0, delFailed = 0;
-        for (const m of matches) {
+        for (const m of extras) {
             try {
                 const resp = await fetch(CONFIG.API_BASE_URL + '/moneybird/' + config.adminId + '/time_entries/' + m.id, {
                     method: 'DELETE',
@@ -292,27 +339,19 @@
                     }
                 }
             } catch (e) {
-                console.error('[fix] delete failed:', e);
+                console.error('[fix] delete duplicate failed:', e);
                 delFailed++;
             }
         }
 
         if (locked > 0 || delFailed > 0) {
-            alert('Partial: ' + deleted + ' deleted, ' + locked + ' locked (linked to invoice), ' + delFailed + ' failed.\n\nLocked entries must be unlinked from their invoice in Moneybird first.');
+            alert('Duplicates: ' + deleted + ' deleted, ' + locked + ' locked (linked to invoice), ' + delFailed + ' failed.\n\nLocked duplicates must be freed via the invoice (use "Free entries" on its draft invoice, or detach the relevant line).');
         }
 
-        try {
-            await registerSingleEntry(config, row.date, row.description, null, null, {
-                startTime: row.startTime,
-                endTime: row.endTime,
-                lunch: row.lunch,
-                projectId: row.projectId
-            });
-        } catch (e) {
-            console.error('[fix] register failed:', e);
-            alert('Could not register the planned entry: ' + e.message);
+        if (!patched && extras.length === 0) {
+            // Nothing happened.
+            return;
         }
-
         // Re-fetch + re-classify so the modal reflects the new state.
         try {
             const monthKey = document.getElementById('monthPicker').value;
@@ -410,8 +449,14 @@
     async function fetchMonthEntries(config, monthKey) {
         if (!monthKey) return [];
         const [year, month] = monthKey.split('-').map(Number);
-        const startDate = year + '-' + String(month).padStart(2, '0') + '-01';
-        const endDate = year + '-' + String(month).padStart(2, '0') + '-' + new Date(year, month, 0).getDate();
+        // Moneybird's time_entries `period:` range filter REQUIRES YYYYMMDD
+        // (no hyphens). Using YYYY-MM-DD returns HTTP 400 and the catch
+        // path silently disables the diff -- which lets duplicate entries
+        // through. Keep this in sync with fetchExistingHours() in
+        // moneybird.js.
+        const lastDay = new Date(year, month, 0).getDate();
+        const startDate = '' + year + String(month).padStart(2, '0') + '01';
+        const endDate   = '' + year + String(month).padStart(2, '0') + String(lastDay).padStart(2, '0');
         let all = [];
         let page = 1;
         let hasMore = true;
