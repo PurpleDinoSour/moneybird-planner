@@ -525,21 +525,40 @@ function renderHoursList() {
         summaryHtml += pillsHtml;
     }
 
-    // Compare with selected calendar dates
+    // Compare with selected calendar dates.
+    // The diff is per (date, project) -- NOT per date -- so a day that already
+    // has an RIVM entry still reports the DNB entry as missing, and vice versa.
+    // Otherwise invoiced hours for one customer mask missing hours for another.
     var selectedDates = Array.from(appState.selectedDates).sort();
-    var missing = [];
+    var missing = []; // array of { date, job } (job = null in single-job/WBSO mode)
     var extra = [];
     if (selectedDates.length > 0) {
         var existingDates = new Set();
+        var existingJobKeys = new Set(); // 'YYYY-MM-DD|projectId'
         appState.fetchedEntries.forEach(function(entry) {
             if (entry.started_at) {
                 var d = new Date(entry.started_at);
                 if (!isNaN(d)) {
-                    existingDates.add(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'));
+                    var dateKey2 = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+                    existingDates.add(dateKey2);
+                    var entryPid = entry.project_id || (entry.project && entry.project.id);
+                    if (entryPid) existingJobKeys.add(dateKey2 + '|' + String(entryPid));
                 }
             }
         });
-        missing = selectedDates.filter(function(d) { return !existingDates.has(d); });
+        if (appState.currentHourType === 'facturable' && appState.jobs.length > 0) {
+            selectedDates.forEach(function(date) {
+                getJobsForDate(date).forEach(function(job) {
+                    var present = job.projectId
+                        ? existingJobKeys.has(date + '|' + String(job.projectId))
+                        : existingDates.has(date);
+                    if (!present) missing.push({ date: date, job: job });
+                });
+            });
+        } else {
+            missing = selectedDates.filter(function(d) { return !existingDates.has(d); })
+                .map(function(d) { return { date: d, job: null }; });
+        }
         extra = Array.from(existingDates).filter(function(d) { return !appState.selectedDates.has(d); }).sort();
 
         summaryHtml += '<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border,#E2E8F0);font-size:0.85rem;">';
@@ -548,7 +567,10 @@ function renderHoursList() {
             summaryHtml += '<span style="color:var(--success,#22c55e);">All ' + selectedDates.length + ' selected days match Moneybird</span>';
         } else {
             if (missing.length > 0) {
-                summaryHtml += '<div style="margin-top:4px;color:var(--danger,#ef4444);">Missing in Moneybird (' + missing.length + '): ' + missing.join(', ');
+                var missingLabels = missing.map(function(m) {
+                    return m.job ? m.date + ' (' + escapeHtml(m.job.name) + ')' : m.date;
+                });
+                summaryHtml += '<div style="margin-top:4px;color:var(--danger,#ef4444);">Missing in Moneybird (' + missing.length + '): ' + missingLabels.join(', ');
                 summaryHtml += ' <button onclick="registerMissingDays()" style="margin-left:8px;padding:2px 10px;border:none;border-radius:4px;background:var(--success,#22c55e);color:#fff;font-weight:600;cursor:pointer;font-size:0.85rem;">Register Missing</button>';
                 summaryHtml += '</div>';
             }
@@ -559,7 +581,7 @@ function renderHoursList() {
         summaryHtml += '</div>';
     }
 
-    // Store missing dates for the register button
+    // Store missing (date, job) pairs for the register button
     appState.missingDates = missing;
 
     summaryHtml += '</div>';
@@ -751,49 +773,49 @@ async function registerMissingDays() {
 
     var desc = document.getElementById('desc').value || (appState.currentHourType === 'wbso' ? 'WBSO R&D Work' : 'Consultancy uren');
 
-    // Build entries using job schedules for facturable
+    // Build one entry per missing (date, job) pair -- only the specific
+    // job entry that is absent gets registered, never sibling jobs that
+    // already exist (e.g. invoiced RIVM hours on the same day).
     var entries = [];
-    if (appState.currentHourType === 'facturable' && appState.jobs.length > 0) {
-        missing.forEach(function(date) {
-            var jobsForDate = getJobsForDate(date);
-            jobsForDate.forEach(function(job) {
-                var sched = getScheduleForJobDate(job, date);
-                entries.push({
-                    date: date,
-                    description: (typeof expandDescriptionTemplate === 'function')
-                        ? expandDescriptionTemplate(job.description || desc, date, job.name)
-                        : (job.description || desc),
-                    startTime: sched.start,
-                    endTime: sched.end,
-                    lunch: sched.lunch,
-                    projectId: job.projectId,
-                    jobName: job.name
-                });
-            });
-        });
-    } else {
-        var startTime = document.getElementById('startTime').value;
-        var endTime = document.getElementById('endTime').value;
-        var lunchChecked = document.getElementById('lunchBreak').checked;
-        missing.forEach(function(date) {
+    missing.forEach(function(m) {
+        if (m.job) {
+            var sched = getScheduleForJobDate(m.job, m.date);
             entries.push({
-                date: date,
+                date: m.date,
+                description: (typeof expandDescriptionTemplate === 'function')
+                    ? expandDescriptionTemplate(m.job.description || desc, m.date, m.job.name)
+                    : (m.job.description || desc),
+                startTime: sched.start,
+                endTime: sched.end,
+                lunch: sched.lunch,
+                projectId: m.job.projectId,
+                jobName: m.job.name
+            });
+        } else {
+            entries.push({
+                date: m.date,
                 description: desc,
-                startTime: startTime,
-                endTime: endTime,
-                lunch: lunchChecked,
+                startTime: document.getElementById('startTime').value,
+                endTime: document.getElementById('endTime').value,
+                lunch: document.getElementById('lunchBreak').checked,
                 projectId: config.projectId,
                 jobName: null
             });
-        });
-    }
+        }
+    });
 
     if (entries.length === 0) {
         alert('No entries to register for missing days.');
         return;
     }
 
-    if (!confirm('Register ' + entries.length + ' entries for ' + missing.length + ' missing day(s)?')) {
+    var perJob = {};
+    entries.forEach(function(e) {
+        var key = e.jobName || 'default';
+        perJob[key] = (perJob[key] || 0) + 1;
+    });
+    var breakdown = Object.keys(perJob).map(function(k) { return perJob[k] + 'x ' + k; }).join(', ');
+    if (!confirm('Register ' + entries.length + ' missing entr' + (entries.length === 1 ? 'y' : 'ies') + ' (' + breakdown + ')?')) {
         return;
     }
 
