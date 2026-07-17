@@ -1,69 +1,88 @@
 {
     "jobs":  [
                  {
-                     "id":  "job_migrated_main",
-                     "name":  "RIVM",
-                     "color":  "#f59e0b",
-                     "projectId":  "478308704970605831",
-                     "projectName":  "Rijksinstituut voor Volksgezondheid en Milieu (RIVM)",
-                     "description":  "Consultancy uren",
-                     "schedule":  {
-                                      "2":  {
-                                                "start":  "07:00",
-                                                "end":  "17:00",
-                                                "lunch":  true
-                                            },
-                                      "5":  {
-                                                "start":  "07:00",
-                                                "end":  "17:00",
-                                                "lunch":  true
-                                            }
-                                  },
-                     "dateOverrides":  {
-                                           "2026-05-05":  false
-                                       }
-                 },
-                 {
-                     "id":  "job_1777374544896",
+                     "id":  "job_1778866964287",
                      "name":  "DNB",
-                     "color":  "#3b82f6",
+                     "color":  "#3B82F6",
                      "projectId":  "483870075814676273",
                      "projectName":  "DNB",
-                     "description":  "Consultancy uren",
+                     "description":  "Consultancy uren {month} {job}",
+                     "hourlyRate":  107.5,
                      "schedule":  {
                                       "1":  {
-                                                "start":  "09:00",
-                                                "end":  "18:00",
+                                                "start":  "07:00",
+                                                "end":  "16:00",
                                                 "lunch":  true
                                             },
                                       "2":  {
-                                                "start":  "09:00",
-                                                "end":  "18:00",
+                                                "start":  "07:00",
+                                                "end":  "12:00",
                                                 "lunch":  true
                                             },
                                       "3":  {
-                                                "start":  "09:00",
-                                                "end":  "18:00",
+                                                "start":  "07:00",
+                                                "end":  "16:00",
                                                 "lunch":  true
                                             },
                                       "4":  {
-                                                "start":  "09:00",
-                                                "end":  "18:00",
+                                                "start":  "07:00",
+                                                "end":  "16:00",
                                                 "lunch":  true
                                             },
                                       "5":  {
-                                                "start":  "08:00",
-                                                "end":  "12:00",
-                                                "lunch":  false
+                                                "start":  "07:00",
+                                                "end":  "16:00",
+                                                "lunch":  true
                                             }
                                   },
                      "dateOverrides":  {
-                                           "2026-04-03":  false,
-                                           "2026-05-05":  false,
+                                           "2026-05-25":  false,
+                                           "2026-05-12":  {
+                                                              "start":  "07:00",
+                                                              "end":  "16:00",
+                                                              "lunch":  true
+                                                          },
+                                           "2026-05-01":  false,
+                                           "2026-05-06":  false,
+                                           "2026-05-05":  {
+                                                              "start":  "08:00",
+                                                              "end":  "17:00",
+                                                              "lunch":  true
+                                                          },
                                            "2026-05-14":  false,
-                                           "2026-05-25":  false
+                                           "2026-06-08":  false,
+                                           "2026-06-09":  {
+                                                              "start":  "07:00",
+                                                              "end":  "16:00",
+                                                              "lunch":  true
+                                                          }
+                                       }
+                 },
+                 {
+                     "id":  "job_1778867041675",
+                     "name":  "RIVM",
+                     "color":  "#06B6D4",
+                     "projectId":  "478308704970605831",
+                     "projectName":  "Rijksinstituut voor Volksgezondheid en Milieu (RIVM)",
+                     "description":  "Consultancy uren {month} {job}",
+                     "hourlyRate":  112,
+                     "schedule":  {
+                                      "2":  {
+                                                "start":  "07:00",
+                                                "end":  "17:00",
+                                                "lunch":  true
+                                            },
+                                      "5":  {
+                                                "start":  "07:00",
+                                                "end":  "17:00",
+                                                "lunch":  true
+                                            }
+                                  },
+                     "dateOverrides":  {
+                                           "2026-05-06":  true,
+                                           "2026-05-05":  false
                                        }
                  }
              ],
-    "lastModified":  "2026-07-17T08:50:09.222Z"
+    "lastModified":  "2026-07-17T12:21:51.373Z"
 }
